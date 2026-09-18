@@ -55,7 +55,7 @@ function friendlyDbError(message: string): string {
   }
   if (message.includes('permission denied') || message.includes('policy')) {
     return "You don't have permission to do that.";
-  }
+  } 
 
   return message;
 }

@@ -117,8 +117,8 @@ export const InstallerPortal: React.FC<InstallerPortalProps> = ({ currentUser, o
       <header className="sticky top-0 z-30 bg-white border-b border-[#DFE2DE] px-4 py-3 shadow-2xs">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-[#12161A] text-white flex items-center justify-center font-bold text-xs">
-              EB
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+              <img src="/everlast-logo.jpg" alt="Everlast Bathrooms" className="w-full h-full object-contain" />
             </div>
             <div>
               <h1 className="text-sm font-bold text-[#12161A] tracking-tight">

@@ -128,8 +128,8 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
       {/* Left Sidebar */}
       <aside className="w-60 bg-[#12161A] text-white flex flex-col shrink-0 border-r border-[#3A424B]/30 select-none">
         <div className="p-4 border-b border-white/10 flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#0F5CC4] flex items-center justify-center font-bold text-xs tracking-wider text-white">
-            EB
+          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shrink-0 overflow-hidden">
+            <img src="/everlast-logo.jpg" alt="Everlast Bathrooms" className="w-full h-full object-contain" />
           </div>
           <div>
             <span className="font-bold text-sm tracking-tight block leading-tight">EVERLAST</span>

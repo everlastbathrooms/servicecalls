@@ -425,6 +425,17 @@ export async function updateServiceCall(
 }
 
 /**
+ * Permanently deletes a service call (and, via ON DELETE CASCADE, its
+ * attachments and notes). Restricted to admins by the "admin delete calls"
+ * RLS policy in supabase/schema.sql — this call will fail with a Postgres
+ * permission error for any other role.
+ */
+export async function deleteServiceCall(callId: string): Promise<void> {
+  const { error } = await supabase.from('service_calls').delete().eq('id', callId);
+  if (error) throw new Error(friendlyDbError(error.message));
+}
+
+/**
  * Calls the installer_complete_call RPC (supabase/schema.sql, Section 10),
  * which is the only write path installers are permitted to take on a
  * service_calls row: status in ('completed','blocked','in_progress') and,

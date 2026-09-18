@@ -92,6 +92,17 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
     }
   };
 
+  const handleDeleteCall = async (callId: string) => {
+    try {
+      await api.deleteServiceCall(callId);
+      setSelectedCallId(null);
+      await loadData();
+      showToast('Work order deleted');
+    } catch (e: any) {
+      alert(`Error: ${e.message}`);
+    }
+  };
+
   const handleUploadAttachment = async (callId: string, file: File) => {
     try {
       await api.uploadAttachment({ callId, file, phase: 'reported' });
@@ -250,6 +261,7 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
                 onUpdateCall={handleUpdateCall}
                 onAddNote={handleAddNote}
                 onUploadAttachment={handleUploadAttachment}
+                onDeleteCall={handleDeleteCall}
               />
             ) : currentTab === 'team' && isAdmin ? (
               <TeamView

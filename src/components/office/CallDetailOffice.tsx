@@ -14,6 +14,7 @@ import {
   MessageSquare,
   DollarSign,
   Share2,
+  Trash2,
 } from 'lucide-react';
 import {
   Attachment,
@@ -40,6 +41,7 @@ interface CallDetailOfficeProps {
   onUpdateCall: (callId: string, updates: Partial<ServiceCall>) => void;
   onAddNote: (callId: string, body: string, visibility: 'shared' | 'internal') => void;
   onUploadAttachment: (callId: string, file: File) => void;
+  onDeleteCall: (callId: string) => void;
 }
 
 export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
@@ -50,6 +52,7 @@ export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
   onUpdateCall,
   onAddNote,
   onUploadAttachment,
+  onDeleteCall,
 }) => {
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<Attachment | null>(null);
 
@@ -67,6 +70,7 @@ export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
 
   const priorityColor = getPriorityBorderColor(call.priority);
   const statusBadge = getStatusBadge(call.status);
+  const isAdmin = currentUser.role === 'admin';
 
   const reportedAttachments = (call.attachments || []).filter((a) => a.phase === 'reported');
   const resolutionAttachments = (call.attachments || []).filter((a) => a.phase === 'resolution');
@@ -88,6 +92,16 @@ export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
     if (!noteBody.trim()) return;
     onAddNote(call.id, noteBody.trim(), noteVisibility);
     setNoteBody('');
+  };
+
+  const handleDeleteClick = () => {
+    const confirmed = window.confirm(
+      `Permanently delete Work Order #${call.jobNumber} for ${call.client?.name || 'this customer'}?\n\n` +
+        'This cannot be undone — all photos, videos, and notes on this call will be deleted too.'
+    );
+    if (confirmed) {
+      onDeleteCall(call.id);
+    }
   };
 
   const handleUploadOfficeMedia = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,6 +145,15 @@ export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
             <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
               <CheckCircle2 className="w-4 h-4" /> Changes saved
             </span>
+          )}
+          {isAdmin && (
+            <button
+              onClick={handleDeleteClick}
+              title="Delete this work order permanently"
+              className="p-2 text-red-600 hover:text-white hover:bg-red-600 rounded-lg border border-red-200 hover:border-red-600 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           )}
           <button
             onClick={handleSaveEdits}

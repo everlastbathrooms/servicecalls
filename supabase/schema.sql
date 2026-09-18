@@ -240,6 +240,13 @@ CREATE POLICY "office and admin update anything"
 ON service_calls FOR UPDATE
 USING (auth_role() IN ('admin', 'office'));
 
+-- deleting a call is destructive (cascades to its attachments and notes),
+-- so it's restricted to admins only, unlike insert/update above.
+DROP POLICY IF EXISTS "admin delete calls" ON service_calls;
+CREATE POLICY "admin delete calls"
+ON service_calls FOR DELETE
+USING (auth_role() = 'admin');
+
 -- attachments: visible to anyone who can see the parent call; anyone signed in can upload.
 DROP POLICY IF EXISTS "read attachments of visible calls" ON attachments;
 CREATE POLICY "read attachments of visible calls" ON attachments FOR SELECT

@@ -254,11 +254,10 @@ export const CreateCallModal: React.FC<CreateCallModalProps> = ({ isOpen, onClos
                         setSelectedClientId('');
                         setIsClientDropdownOpen(true);
                       }}
-                      onFocus={() => setIsClientDropdownOpen(true)}
                       onBlur={() => setTimeout(() => setIsClientDropdownOpen(false), 150)}
                       className="w-full text-xs p-2.5 bg-white border border-[#DFE2DE] rounded-lg focus:border-[#0F5CC4] outline-none font-medium"
                     />
-                    {isClientDropdownOpen && (
+                    {isClientDropdownOpen && trimmedClientQuery && (
                       <div className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-[#DFE2DE] rounded-lg shadow-lg">
                         {filteredClients.length > 0 ? (
                           filteredClients.map((c) => (

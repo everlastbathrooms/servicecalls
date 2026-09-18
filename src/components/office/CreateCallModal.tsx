@@ -40,6 +40,25 @@ export const CreateCallModal: React.FC<CreateCallModalProps> = ({ isOpen, onClos
 
   useEffect(() => {
     if (!isOpen) return;
+
+    // Wipe any leftover input from the last time this call was created,
+    // since the modal stays mounted (just hidden) between opens.
+    setSelectedClientId('');
+    setIsCreatingClient(false);
+    setNewClientName('');
+    setNewClientPhone('');
+    setNewClientAddress('');
+    setJobNumber('');
+    setInstallerId('');
+    setReportedDate(new Date().toISOString().split('T')[0]);
+    setInstallDate('');
+    setPriority('mid');
+    setResponsibility('installer');
+    setBilling('unpaid');
+    setDescription('');
+    setPendingFiles([]);
+    setErrorMessage('');
+
     api.getClients().then((data) => {
       setClients(data);
       setIsCreatingClient(data.length === 0);

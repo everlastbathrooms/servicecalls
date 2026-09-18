@@ -20,6 +20,8 @@ export const CreateCallModal: React.FC<CreateCallModalProps> = ({ isOpen, onClos
   const [installers, setInstallers] = useState<UserProfile[]>([]);
 
   const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [clientQuery, setClientQuery] = useState('');
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
   const [newClientName, setNewClientName] = useState('');
   const [newClientPhone, setNewClientPhone] = useState('');
@@ -44,6 +46,8 @@ export const CreateCallModal: React.FC<CreateCallModalProps> = ({ isOpen, onClos
     // Wipe any leftover input from the last time this call was created,
     // since the modal stays mounted (just hidden) between opens.
     setSelectedClientId('');
+    setClientQuery('');
+    setIsClientDropdownOpen(false);
     setIsCreatingClient(false);
     setNewClientName('');
     setNewClientPhone('');
@@ -62,7 +66,6 @@ export const CreateCallModal: React.FC<CreateCallModalProps> = ({ isOpen, onClos
     api.getClients().then((data) => {
       setClients(data);
       setIsCreatingClient(data.length === 0);
-      if (data.length > 0) setSelectedClientId(data[0].id);
     });
     api.getActiveInstallers().then((data) => {
       setInstallers(data);
@@ -147,6 +150,23 @@ export const CreateCallModal: React.FC<CreateCallModalProps> = ({ isOpen, onClos
 
   const selectedInstaller = installers.find((i) => i.id === installerId);
 
+  const trimmedClientQuery = clientQuery.trim();
+  const filteredClients = trimmedClientQuery
+    ? clients.filter((c) => c.name.toLowerCase().includes(trimmedClientQuery.toLowerCase()))
+    : clients;
+
+  const handleSelectClient = (client: Client) => {
+    setSelectedClientId(client.id);
+    setClientQuery(client.name);
+    setIsClientDropdownOpen(false);
+  };
+
+  const handleStartCreatingClient = () => {
+    setIsCreatingClient(true);
+    setNewClientName(trimmedClientQuery);
+    setIsClientDropdownOpen(false);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
@@ -180,20 +200,27 @@ export const CreateCallModal: React.FC<CreateCallModalProps> = ({ isOpen, onClos
                   <label className="block text-xs font-bold uppercase tracking-wider text-[#3A424B]">
                     Client <span className="text-red-500">*</span>
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setIsCreatingClient(!isCreatingClient)}
-                    className="text-xs text-[#0F5CC4] font-semibold hover:underline flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>{isCreatingClient ? 'Select existing' : 'Create new client'}</span>
-                  </button>
+                  {isCreatingClient && clients.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreatingClient(false);
+                        setNewClientName('');
+                        setNewClientPhone('');
+                        setNewClientAddress('');
+                      }}
+                      className="text-xs text-[#0F5CC4] font-semibold hover:underline"
+                    >
+                      Search existing instead
+                    </button>
+                  )}
                 </div>
 
                 {isCreatingClient ? (
                   <div className="p-3 bg-[#FBFBF9] rounded-xl border border-[#DFE2DE] space-y-2.5">
                     <input
                       type="text"
+                      autoFocus
                       placeholder="Client Full Name (e.g. Jason Kole (Phase 1))"
                       value={newClientName}
                       onChange={(e) => setNewClientName(e.target.value)}
@@ -217,17 +244,56 @@ export const CreateCallModal: React.FC<CreateCallModalProps> = ({ isOpen, onClos
                     </div>
                   </div>
                 ) : (
-                  <select
-                    value={selectedClientId}
-                    onChange={(e) => setSelectedClientId(e.target.value)}
-                    className="w-full text-xs p-2.5 bg-white border border-[#DFE2DE] rounded-lg focus:border-[#0F5CC4] outline-none font-medium"
-                  >
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.phone ? `(${c.phone})` : ''} {c.address ? `• ${c.address}` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Type a client name to search..."
+                      value={clientQuery}
+                      onChange={(e) => {
+                        setClientQuery(e.target.value);
+                        setSelectedClientId('');
+                        setIsClientDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsClientDropdownOpen(true)}
+                      onBlur={() => setTimeout(() => setIsClientDropdownOpen(false), 150)}
+                      className="w-full text-xs p-2.5 bg-white border border-[#DFE2DE] rounded-lg focus:border-[#0F5CC4] outline-none font-medium"
+                    />
+                    {isClientDropdownOpen && (
+                      <div className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-[#DFE2DE] rounded-lg shadow-lg">
+                        {filteredClients.length > 0 ? (
+                          filteredClients.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => handleSelectClient(c)}
+                              className="w-full text-left px-3 py-2 text-xs hover:bg-[#FBFBF9] border-b border-[#DFE2DE] last:border-b-0"
+                            >
+                              <span className="font-medium text-[#12161A]">{c.name}</span>
+                              {(c.phone || c.address) && (
+                                <span className="block text-[10px] text-[#6B7A88]">
+                                  {[c.phone, c.address].filter(Boolean).join(' • ')}
+                                </span>
+                              )}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-xs text-[#6B7A88]">No matching clients.</div>
+                        )}
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={handleStartCreatingClient}
+                          className="w-full text-left px-3 py-2 text-xs font-semibold text-[#0F5CC4] hover:bg-[#0F5CC4]/5 flex items-center gap-1.5 border-t border-[#DFE2DE]"
+                        >
+                          <Plus className="w-3.5 h-3.5 shrink-0" />
+                          <span>
+                            {trimmedClientQuery ? `Create new client "${trimmedClientQuery}"` : 'Create new client'}
+                          </span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 

@@ -1,3 +1,5 @@
+> **Working on this codebase (human or AI)?** Read [CLAUDE.md](CLAUDE.md) first — it covers roles/permissions, the event model, app flow, and rules for what's in/out of scope. Everything below this line is leftover scaffolding from the original project template and is not accurate for this app anymore.
+
 <div align="center">
 <img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>

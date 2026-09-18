@@ -1,7 +1,8 @@
 // Supabase Edge Function: send-notification
 //
-// Sends the "new call assigned" / "reassigned" email to a crew via Resend,
-// and logs the outcome to notification_log. The Resend API key stays
+// Sends transactional emails via Resend for: new_call / reassigned (to the
+// assigned crew member) and completed / blocked (to the office inbox), and
+// logs the outcome to notification_log. The Resend API key stays
 // server-side here — it must never be shipped to the browser bundle.
 //
 // Deploy with: supabase functions deploy send-notification
@@ -24,9 +25,11 @@ const RESEND_FROM = Deno.env.get('RESEND_FROM_EMAIL') ?? 'dispatch@everlastbathr
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SECRET_KEY = getSecretKey();
 
+type EventType = 'new_call' | 'reassigned' | 'updated' | 'overdue' | 'completed' | 'blocked';
+
 interface NotificationPayload {
   serviceCallId: string;
-  eventType: 'new_call' | 'reassigned' | 'updated' | 'overdue' | 'completed';
+  eventType: EventType;
   recipientEmail: string;
   recipientName: string;
   jobNumber: string;
@@ -38,13 +41,30 @@ interface NotificationPayload {
   reportedDate: string;
   responsibility: string;
   billing: string;
+  completionNote?: string | null;
 }
 
+const SUBJECT_BY_EVENT: Record<EventType, (p: NotificationPayload) => string> = {
+  new_call: (p) => `[Everlast Bathrooms] New Service Call Assigned: Job #${p.jobNumber} - ${p.clientName}`,
+  reassigned: (p) => `[Everlast Bathrooms] Call Reassigned: Job #${p.jobNumber} - ${p.clientName}`,
+  updated: (p) => `[Everlast Bathrooms] Call Updated: Job #${p.jobNumber} - ${p.clientName}`,
+  overdue: (p) => `[Everlast Bathrooms] Overdue: Job #${p.jobNumber} - ${p.clientName}`,
+  completed: (p) => `[Everlast Bathrooms] Call Completed: Job #${p.jobNumber} - ${p.clientName}`,
+  blocked: (p) => `[Everlast Bathrooms] Call Blocked: Job #${p.jobNumber} - ${p.clientName}`,
+};
+
+const INTRO_BY_EVENT: Record<EventType, (p: NotificationPayload) => string> = {
+  new_call: () => 'A new service call has been assigned to you. Review the details below before heading to the site.',
+  reassigned: (p) => `Service call Job #${p.jobNumber} has been reassigned to you.`,
+  updated: (p) => `Service call Job #${p.jobNumber} has been updated.`,
+  overdue: (p) => `Service call Job #${p.jobNumber} has been open past the overdue threshold.`,
+  completed: (p) => `${p.recipientName === 'Office' ? 'The crew' : p.recipientName} marked Job #${p.jobNumber} as <strong>completed</strong>.`,
+  blocked: (p) => `${p.recipientName === 'Office' ? 'The crew' : p.recipientName} marked Job #${p.jobNumber} as <strong>blocked</strong> and cannot proceed.`,
+};
+
 function buildEmail(payload: NotificationPayload) {
-  const isNew = payload.eventType === 'new_call';
-  const subject = isNew
-    ? `[Everlast Bathrooms] New Service Call Assigned: Job #${payload.jobNumber} - ${payload.clientName}`
-    : `[Everlast Bathrooms] Call Reassigned: Job #${payload.jobNumber} - ${payload.clientName}`;
+  const subject = SUBJECT_BY_EVENT[payload.eventType](payload);
+  const intro = INTRO_BY_EVENT[payload.eventType](payload);
 
   const priorityColor =
     payload.priority === 'high' ? '#C4342B' : payload.priority === 'mid' ? '#C97A16' : '#6B7A88';
@@ -60,11 +80,7 @@ function buildEmail(payload: NotificationPayload) {
           ${payload.priority} PRIORITY
         </div>
         <h2 style="margin:0 0 8px; font-size:18px; color:#12161A;">Hello ${payload.recipientName},</h2>
-        <p style="margin:0 0 20px; font-size:15px; color:#3A424B;">
-          ${isNew
-            ? 'A new service call has been assigned to you. Review the details below before heading to the site.'
-            : `Service call Job #${payload.jobNumber} has been reassigned to you.`}
-        </p>
+        <p style="margin:0 0 20px; font-size:15px; color:#3A424B;">${intro}</p>
         <table style="width:100%; border-collapse:collapse; font-size:14px; background:#fff; border:1px solid #DFE2DE; border-radius:6px; padding:12px;">
           <tr><td style="padding:6px 0; color:#6B7A88; width:130px;">Job Number:</td><td style="padding:6px 0; font-weight:700;">#${payload.jobNumber}</td></tr>
           <tr><td style="padding:6px 0; color:#6B7A88;">Client:</td><td style="padding:6px 0; font-weight:600;">${payload.clientName}</td></tr>
@@ -80,8 +96,17 @@ function buildEmail(payload: NotificationPayload) {
             ${payload.description}
           </div>
         </div>
+        ${payload.completionNote ? `
+        <div style="margin-top:14px; padding-top:14px; border-top:1px solid #DFE2DE;">
+          <div style="font-size:13px; font-weight:600; color:#6B7A88; margin-bottom:6px;">
+            ${payload.eventType === 'blocked' ? 'REASON GIVEN BY CREW:' : 'COMPLETION NOTE:'}
+          </div>
+          <div style="font-size:15px; color:#12161A; background:#FBFBF9; padding:12px; border-radius:4px; border-left:3px solid ${payload.eventType === 'blocked' ? '#C97A16' : '#0F5CC4'};">
+            ${payload.completionNote}
+          </div>
+        </div>` : ''}
         <p style="margin:20px 0 0; font-size:13px; color:#6B7A88; text-align:center;">
-          Open the Everlast Bathrooms portal on your phone to view photos and mark the call complete.
+          Open the Everlast Bathrooms portal to view full details and photos.
         </p>
       </div>
     </div>

@@ -205,6 +205,18 @@ export async function signOut(): Promise<void> {
   await supabase.auth.signOut();
 }
 
+/**
+ * Sends a password-reset email. The link redirects back to this app with
+ * `type=recovery` in the URL, which App.tsx detects to show SetPasswordView
+ * before letting the user into any portal screen.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: window.location.origin,
+  });
+  if (error) throw new Error(error.message);
+}
+
 export async function getCurrentProfile(): Promise<UserProfile | null> {
   const { data: sessionData } = await supabase.auth.getSession();
   const userId = sessionData.session?.user?.id;
@@ -434,6 +446,13 @@ export async function installerCompleteCall(input: {
   if (input.note && input.note.trim()) {
     await addNote(input.callId, input.note.trim(), 'shared');
   }
+
+  if (input.status === 'completed' || input.status === 'blocked') {
+    const call = await getServiceCallById(input.callId);
+    if (call) {
+      await dispatchOfficeNotification({ call, eventType: input.status, note: input.note });
+    }
+  }
 }
 
 // ---------- Notes ----------
@@ -548,5 +567,43 @@ async function dispatchNotification(input: {
     if (error) console.error('Notification dispatch failed:', await describeFunctionError(error));
   } catch (err) {
     console.error('Notification dispatch failed:', err);
+  }
+}
+
+const OFFICE_NOTIFICATION_EMAIL = 'office@everlastbathrooms.com';
+
+/**
+ * Dispatches the "call completed" / "call blocked" email to the office
+ * inbox via the same `send-notification` Edge Function. Always sent
+ * regardless of any individual user's notify_by_email preference, since
+ * this goes to a shared office address rather than a specific person.
+ */
+async function dispatchOfficeNotification(input: {
+  call: ServiceCall;
+  eventType: 'completed' | 'blocked';
+  note?: string;
+}): Promise<void> {
+  try {
+    const { error } = await supabase.functions.invoke('send-notification', {
+      body: {
+        serviceCallId: input.call.id,
+        eventType: input.eventType,
+        recipientEmail: OFFICE_NOTIFICATION_EMAIL,
+        recipientName: 'Office',
+        jobNumber: input.call.jobNumber,
+        clientName: input.call.client?.name || 'Customer',
+        clientPhone: input.call.client?.phone || null,
+        clientAddress: input.call.client?.address || null,
+        priority: input.call.priority,
+        description: input.call.description,
+        reportedDate: input.call.reportedDate,
+        responsibility: input.call.responsibility,
+        billing: input.call.billing,
+        completionNote: input.note || input.call.completionNote || null,
+      },
+    });
+    if (error) console.error('Office notification dispatch failed:', await describeFunctionError(error));
+  } catch (err) {
+    console.error('Office notification dispatch failed:', err);
   }
 }

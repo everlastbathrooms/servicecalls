@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS notification_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   service_call_id UUID REFERENCES service_calls(id) ON DELETE CASCADE,
   recipient_email TEXT NOT NULL,
-  event_type TEXT NOT NULL CHECK (event_type IN ('new_call','updated','reassigned','overdue','completed')),
+  event_type TEXT NOT NULL CHECK (event_type IN ('new_call','updated','reassigned','overdue','completed','blocked')),
   provider_id TEXT NULL,
   status TEXT NOT NULL DEFAULT 'queued',
   error TEXT NULL,

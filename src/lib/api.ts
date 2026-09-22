@@ -435,6 +435,18 @@ export async function updateServiceCall(
   const isReassigned =
     updates.installerId !== undefined && updates.installerId !== previous.installerId;
 
+  // The DB requires completed_at/completed_by whenever status = 'completed'
+  // (see the completed_fields_present constraint in schema.sql). The
+  // installer's phone-complete RPC stamps these automatically, but this
+  // office-side path needs to stamp them itself when office marks a call
+  // completed directly.
+  let completedStamp: { completed_at: string; completed_by: string } | undefined;
+  if (updates.status === 'completed' && previous.status !== 'completed') {
+    const officeUser = await getCurrentProfile();
+    if (!officeUser) throw new Error('Not authenticated.');
+    completedStamp = { completed_at: new Date().toISOString(), completed_by: officeUser.id };
+  }
+
   const { data, error } = await supabase
     .from('service_calls')
     .update({
@@ -444,6 +456,7 @@ export async function updateServiceCall(
       billing: updates.billing,
       status: updates.status,
       updated_at: new Date().toISOString(),
+      ...completedStamp,
     })
     .eq('id', callId)
     .select(SERVICE_CALL_SELECT)

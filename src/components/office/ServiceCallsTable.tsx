@@ -40,10 +40,14 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
   onSelectCall,
   onCreateCall,
 }) => {
+  // Default to hiding completed/cancelled calls so the main screen only
+  // shows work that still needs attention.
+  const DEFAULT_STATUS_FILTER = 'active';
+
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [installerFilter, setInstallerFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(DEFAULT_STATUS_FILTER);
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [responsibilityFilter, setResponsibilityFilter] = useState('all');
 
@@ -234,12 +238,12 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
             <option value="client">Client</option>
           </select>
 
-          {(searchQuery || installerFilter !== 'all' || statusFilter !== 'all' || priorityFilter !== 'all' || responsibilityFilter !== 'all') && (
+          {(searchQuery || installerFilter !== 'all' || statusFilter !== DEFAULT_STATUS_FILTER || priorityFilter !== 'all' || responsibilityFilter !== 'all') && (
             <button
               onClick={() => {
                 setSearchQuery('');
                 setInstallerFilter('all');
-                setStatusFilter('all');
+                setStatusFilter(DEFAULT_STATUS_FILTER);
                 setPriorityFilter('all');
                 setResponsibilityFilter('all');
               }}

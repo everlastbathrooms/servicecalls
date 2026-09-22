@@ -239,14 +239,14 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
           </span>
           <button
             onClick={() => goToTab('service_calls')}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-colors ${
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-left transition-colors ${
               currentTab === 'service_calls' && !selectedCallId
                 ? 'bg-[#0F5CC4] text-white font-bold'
                 : 'text-gray-300 hover:text-white hover:bg-white/5'
             }`}
           >
             <div className="flex items-center gap-2.5">
-              <ClipboardList className="w-4 h-4" />
+              <ClipboardList className="w-4 h-4 shrink-0" />
               <span>Service Calls (Post-Install)</span>
             </div>
             {openCallsCount > 0 && (
@@ -257,15 +257,15 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
           </button>
           <button
             onClick={() => goToTab('communications')}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-colors mt-1 ${
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-left transition-colors mt-1 ${
               currentTab === 'communications' && !selectedCommunicationId
                 ? 'bg-[#0F5CC4] text-white font-bold'
                 : 'text-gray-300 hover:text-white hover:bg-white/5'
             }`}
           >
             <div className="flex items-center gap-2.5">
-              <MessageCircle className="w-4 h-4" />
-              <span>Communications (Pre-Install)</span>
+              <MessageCircle className="w-4 h-4 shrink-0" />
+              <span>Client Communications (Pre-Install)</span>
             </div>
             {openCommunicationsCount > 0 && (
               <span className="bg-[#0F5CC4]/20 text-blue-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
@@ -281,14 +281,14 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
               </span>
               <button
                 onClick={() => goToTab('team')}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-left transition-colors ${
                   currentTab === 'team' && !selectedCallId
                     ? 'bg-[#0F5CC4] text-white font-bold'
                     : 'text-gray-300 hover:text-white hover:bg-white/5'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <Users className="w-4 h-4" />
+                  <Users className="w-4 h-4 shrink-0" />
                   <span>Team</span>
                 </div>
                 <span className="bg-white/10 text-gray-300 text-[10px] px-1.5 py-0.5 rounded font-mono">

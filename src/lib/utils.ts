@@ -36,6 +36,15 @@ export function formatRelativeDate(dateString?: string | null): string {
   }
 }
 
+// Whole calendar days between the reported date and now, for "how long has
+// this been sitting" at a glance in the calls table. Never negative.
+export function getDaysOpen(reportedDate: string): number {
+  const reported = new Date(reportedDate);
+  const now = new Date();
+  const diffMs = now.getTime() - reported.getTime();
+  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
   const k = 1024;

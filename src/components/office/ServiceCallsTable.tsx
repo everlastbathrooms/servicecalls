@@ -22,6 +22,7 @@ import {
   exportCallsToCsv,
   formatDate,
   formatRelativeDate,
+  getDaysOpen,
   getPriorityBorderColor,
   getStatusBadge,
 } from '../../lib/utils';
@@ -47,7 +48,7 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
   const [responsibilityFilter, setResponsibilityFilter] = useState('all');
 
   // Sorting
-  const [sortField, setSortField] = useState<'reportedDate' | 'jobNumber' | 'priority'>('reportedDate');
+  const [sortField, setSortField] = useState<'reportedDate' | 'jobNumber' | 'priority' | 'daysOpen'>('reportedDate');
   const [sortAsc, setSortAsc] = useState(false);
 
   // Filter logic
@@ -104,6 +105,11 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
         const weight: Record<CallPriority, number> = { high: 3, mid: 2, low: 1 };
         return sortAsc ? weight[a.priority] - weight[b.priority] : weight[b.priority] - weight[a.priority];
       }
+      if (sortField === 'daysOpen') {
+        const daysA = getDaysOpen(a.reportedDate);
+        const daysB = getDaysOpen(b.reportedDate);
+        return sortAsc ? daysA - daysB : daysB - daysA;
+      }
       return 0;
     });
   }, [
@@ -117,7 +123,7 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
     sortAsc,
   ]);
 
-  const toggleSort = (field: 'reportedDate' | 'jobNumber' | 'priority') => {
+  const toggleSort = (field: 'reportedDate' | 'jobNumber' | 'priority' | 'daysOpen') => {
     if (sortField === field) {
       setSortAsc(!sortAsc);
     } else {
@@ -271,6 +277,15 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
                     <ArrowUpDown className="w-3 h-3 text-gray-400" />
                   </div>
                 </th>
+                <th
+                  className="py-3 px-3 cursor-pointer hover:text-[#12161A]"
+                  onClick={() => toggleSort('daysOpen')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Days Open</span>
+                    <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                  </div>
+                </th>
                 <th className="py-3 px-3">Assigned Crew</th>
                 <th className="py-3 px-3">Install Date</th>
                 <th
@@ -295,6 +310,13 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
                   const priorityColor = getPriorityBorderColor(call.priority);
                   const statusBadge = getStatusBadge(call.status);
                   const attachmentCount = (call.attachments || []).length;
+                  const daysOpen = getDaysOpen(call.reportedDate);
+                  const daysOpenClasses =
+                    daysOpen >= 7
+                      ? 'bg-red-50 text-red-700'
+                      : daysOpen >= 3
+                      ? 'bg-amber-50 text-amber-700'
+                      : 'bg-[#F0F2F0] text-[#3A424B]';
 
                   return (
                     <tr
@@ -329,6 +351,15 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
                         <span>{formatDate(call.reportedDate)}</span>
                         <span className="block text-[10px] text-[#6B7A88]">
                           {formatRelativeDate(call.reportedDate)}
+                        </span>
+                      </td>
+
+                      {/* Days Open */}
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <span
+                          className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-full tabular-nums ${daysOpenClasses}`}
+                        >
+                          {daysOpen} {daysOpen === 1 ? 'day' : 'days'}
                         </span>
                       </td>
 
@@ -395,7 +426,7 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
                 })
               ) : (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-[#6B7A88]">
+                  <td colSpan={12} className="py-12 text-center text-[#6B7A88]">
                     <p className="text-sm font-medium">No service calls found matching filters.</p>
                     <button
                       onClick={onCreateCall}

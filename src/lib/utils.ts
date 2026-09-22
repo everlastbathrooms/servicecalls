@@ -1,4 +1,4 @@
-import { CallPriority, CallStatus, ServiceCall } from '../types';
+import { CallPriority, CallStatus, CommunicationMethod, CommunicationStatus, ServiceCall } from '../types';
 
 export function formatDate(dateString?: string | null): string {
   if (!dateString) return '—';
@@ -78,6 +78,36 @@ export function getStatusBadge(status: CallStatus): { label: string; bg: string;
       return { label: 'Completed', bg: 'bg-emerald-100', text: 'text-emerald-800' };
     case 'cancelled':
       return { label: 'Cancelled', bg: 'bg-gray-100', text: 'text-gray-600' };
+  }
+}
+
+export function getCommunicationStatusBadge(
+  status: CommunicationStatus
+): { label: string; bg: string; text: string } {
+  switch (status) {
+    case 'open':
+      return { label: 'Open', bg: 'bg-[#0F5CC4]/10', text: 'text-[#0F5CC4]' };
+    case 'in_progress':
+      return { label: 'In Progress', bg: 'bg-amber-100', text: 'text-amber-800' };
+    case 'resolved':
+      return { label: 'Resolved', bg: 'bg-emerald-100', text: 'text-emerald-800' };
+    case 'closed':
+      return { label: 'Closed', bg: 'bg-gray-100', text: 'text-gray-600' };
+  }
+}
+
+export function getCommunicationMethodLabel(method: CommunicationMethod): string {
+  switch (method) {
+    case 'phone':
+      return 'Phone';
+    case 'email':
+      return 'Email';
+    case 'text':
+      return 'Text';
+    case 'in_person':
+      return 'In Person';
+    case 'other':
+      return 'Other';
   }
 }
 

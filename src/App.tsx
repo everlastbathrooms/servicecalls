@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile } from './types';
 import { supabase } from './lib/supabase';
-import { getCurrentProfile, signOut } from './lib/api';
+import { getCurrentProfile, getProfileById, signOut } from './lib/api';
 import { LoginView } from './components/auth/LoginView';
 import { SetPasswordView } from './components/auth/SetPasswordView';
 import { InstallerPortal } from './components/installer/InstallerPortal';
@@ -28,20 +28,55 @@ export default function App() {
   const [authFlowType, setAuthFlowType] = useState<'invite' | 'recovery' | null>(detectAuthFlowType);
 
   useEffect(() => {
-    getCurrentProfile()
-      .then(setCurrentUser)
-      .finally(() => setIsLoading(false));
+    let cancelled = false;
 
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (!session) {
-        setCurrentUser(null);
-        return;
-      }
-      const profile = await getCurrentProfile();
-      setCurrentUser(profile);
+    getCurrentProfile()
+      .then((profile) => {
+        if (!cancelled) setCurrentUser(profile);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    // IMPORTANT: do not `await` Supabase calls directly inside this callback.
+    // supabase-js holds an auth lock while the listener runs; calling
+    // getSession() / from() here deadlocks and can return a null profile,
+    // which cleared currentUser and bounced users back to the login screen
+    // right after a successful sign-in.
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      setTimeout(() => {
+        void (async () => {
+          if (cancelled) return;
+
+          if (!session?.user) {
+            setCurrentUser(null);
+            return;
+          }
+
+          const profile = await getProfileById(session.user.id);
+          if (cancelled) return;
+
+          if (!profile) {
+            // Keep whatever onLogin already set — don't wipe a good session
+            // just because this fetch raced or failed once.
+            return;
+          }
+
+          if (!profile.isActive) {
+            await signOut();
+            if (!cancelled) setCurrentUser(null);
+            return;
+          }
+
+          setCurrentUser(profile);
+        })();
+      }, 0);
     });
 
-    return () => subscription.subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.subscription.unsubscribe();
+    };
   }, []);
 
   const handleLogout = async () => {

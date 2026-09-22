@@ -15,6 +15,7 @@ import {
   DollarSign,
   Share2,
   Trash2,
+  Headset,
 } from 'lucide-react';
 import {
   Attachment,
@@ -42,6 +43,7 @@ interface CallDetailOfficeProps {
   onAddNote: (callId: string, body: string, visibility: 'shared' | 'internal') => void;
   onUploadAttachment: (callId: string, file: File) => void;
   onDeleteCall: (callId: string) => void;
+  onLogCommunication?: () => void;
 }
 
 export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
@@ -53,6 +55,7 @@ export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
   onAddNote,
   onUploadAttachment,
   onDeleteCall,
+  onLogCommunication,
 }) => {
   const [activeLightboxMedia, setActiveLightboxMedia] = useState<Attachment | null>(null);
 
@@ -105,7 +108,7 @@ export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
   };
 
   const handleUploadOfficeMedia = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+    const files = e.target.files; 
     if (!files || files.length === 0) return;
 
     Array.from(files).forEach((file: File) => {
@@ -145,6 +148,16 @@ export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
             <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
               <CheckCircle2 className="w-4 h-4" /> Changes saved
             </span>
+          )}
+          {onLogCommunication && (
+            <button
+              onClick={onLogCommunication}
+              className="px-3.5 py-2 bg-white hover:bg-gray-50 border border-[#DFE2DE] text-[#3A424B] text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
+              title="Log a customer service ticket for this job"
+            >
+              <Headset className="w-4 h-4 text-[#6B7A88]" />
+              <span>Log Customer Service</span>
+            </button>
           )}
           {isAdmin && (
             <button

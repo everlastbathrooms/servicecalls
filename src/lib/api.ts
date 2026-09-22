@@ -6,6 +6,10 @@ import {
   CallPriority,
   CallStatus,
   Client,
+  CommunicationMethod,
+  CommunicationNote,
+  CommunicationStatus,
+  CustomerCommunication,
   Responsibility,
   ServiceCall,
   ServiceCallNote,
@@ -32,6 +36,9 @@ const CONSTRAINT_MESSAGES: Record<string, string> = {
   attachments_size_bytes_check: 'File exceeds the 100 MB upload limit.',
   profiles_email_key: 'An account with this email address already exists.',
   clients_pkey: 'That client record no longer exists.',
+  customer_communications_service_call_id_fkey: 'Please select a job for this communication.',
+  customer_communications_summary_check: 'Summary must be between 3 and 1000 characters.',
+  communication_notes_body_check: 'Note must be between 1 and 2000 characters.',
 };
 
 /**
@@ -217,14 +224,21 @@ export async function requestPasswordReset(email: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Loads a profile by auth user id. Prefer this inside `onAuthStateChange`
+ * handlers — calling `getSession()` there deadlocks supabase-js (auth lock).
+ */
+export async function getProfileById(userId: string): Promise<UserProfile | null> {
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+  if (error || !data) return null;
+  return mapProfile(data);
+}
+
 export async function getCurrentProfile(): Promise<UserProfile | null> {
   const { data: sessionData } = await supabase.auth.getSession();
   const userId = sessionData.session?.user?.id;
   if (!userId) return null;
-
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-  if (error || !data) return null;
-  return mapProfile(data);
+  return getProfileById(userId);
 }
 
 // ---------- Installers / Team ----------
@@ -665,4 +679,162 @@ async function dispatchOfficeNotification(input: {
   } catch (err) {
     console.error('Office notification dispatch failed:', err);
   }
+}
+
+// ---------- Customer Service Log (office/admin only, always tied to a job) ----------
+//
+// Per client: "Always related to a job, and its just internal so we can
+// keep track of every request." Every entry links to a service_calls row —
+// the client's name comes from that job's linked client, not duplicated
+// here. No client accounts, no client-facing communication, no email.
+//
+// RLS on customer_communications / communication_notes (supabase/schema.sql
+// and supabase/migrations/20260922000000_customer_communications_log.sql)
+// grants access only to 'admin' and 'office' roles — there is no installer
+// policy at all, so this is enforced at the database regardless of what the
+// UI shows.
+
+function mapCommunicationNote(row: any): CommunicationNote {
+  return {
+    id: row.id,
+    communicationId: row.communication_id,
+    authorId: row.author_id,
+    authorName: row.author?.full_name || 'Unknown',
+    body: row.body,
+    createdAt: row.created_at,
+  };
+}
+
+function mapCommunication(row: any): CustomerCommunication {
+  const notes = row.notes ? row.notes.map(mapCommunicationNote) : [];
+  return {
+    id: row.id,
+    serviceCallId: row.service_call_id,
+    jobNumber: row.service_call?.job_number,
+    clientName: row.service_call?.client?.name,
+    dateReceived: row.date_received,
+    method: row.method,
+    status: row.status,
+    handledBy: row.handled_by,
+    handledByName: row.handled_by_profile?.full_name,
+    summary: row.summary,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    notes: notes.sort(
+      (a: CommunicationNote, b: CommunicationNote) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    ),
+  };
+}
+
+const COMMUNICATION_SELECT = `
+  *,
+  service_call:service_calls(job_number, client:clients(name)),
+  handled_by_profile:profiles!customer_communications_handled_by_fkey(full_name),
+  notes:communication_notes(*, author:profiles!communication_notes_author_id_fkey(full_name))
+`;
+
+export async function getCommunications(): Promise<CustomerCommunication[]> {
+  const { data, error } = await supabase
+    .from('customer_communications')
+    .select(COMMUNICATION_SELECT)
+    .order('date_received', { ascending: false });
+
+  if (error) throw new Error(friendlyDbError(error.message));
+  return (data || []).map(mapCommunication);
+}
+
+export async function getCommunicationsForServiceCall(serviceCallId: string): Promise<CustomerCommunication[]> {
+  const { data, error } = await supabase
+    .from('customer_communications')
+    .select(COMMUNICATION_SELECT)
+    .eq('service_call_id', serviceCallId)
+    .order('date_received', { ascending: false });
+
+  if (error) throw new Error(friendlyDbError(error.message));
+  return (data || []).map(mapCommunication);
+}
+
+export async function getCommunicationById(id: string): Promise<CustomerCommunication | null> {
+  const { data, error } = await supabase
+    .from('customer_communications')
+    .select(COMMUNICATION_SELECT)
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) throw new Error(friendlyDbError(error.message));
+  if (!data) return null;
+  return mapCommunication(data);
+}
+
+export async function createCommunication(input: {
+  serviceCallId: string;
+  dateReceived: string;
+  method: CommunicationMethod;
+  handledBy: string;
+  summary: string;
+}): Promise<CustomerCommunication> {
+  const profile = await getCurrentProfile();
+  if (!profile) throw new Error('Not authenticated.');
+
+  const { data, error } = await supabase
+    .from('customer_communications')
+    .insert({
+      service_call_id: input.serviceCallId,
+      date_received: input.dateReceived,
+      method: input.method,
+      status: 'open',
+      handled_by: input.handledBy,
+      summary: input.summary.trim(),
+      created_by: profile.id,
+    })
+    .select(COMMUNICATION_SELECT)
+    .single();
+
+  if (error) throw new Error(friendlyDbError(error.message));
+  return mapCommunication(data);
+}
+
+export async function updateCommunication(
+  id: string,
+  updates: {
+    status?: CommunicationStatus;
+    handledBy?: string;
+    method?: CommunicationMethod;
+    summary?: string;
+  }
+): Promise<CustomerCommunication> {
+  const { data, error } = await supabase
+    .from('customer_communications')
+    .update({
+      status: updates.status,
+      handled_by: updates.handledBy,
+      method: updates.method,
+      summary: updates.summary?.trim(),
+    })
+    .eq('id', id)
+    .select(COMMUNICATION_SELECT)
+    .single();
+
+  if (error) throw new Error(friendlyDbError(error.message));
+  return mapCommunication(data);
+}
+
+export async function addCommunicationNote(communicationId: string, body: string): Promise<CommunicationNote> {
+  const profile = await getCurrentProfile();
+  if (!profile) throw new Error('Not authenticated.');
+
+  const { data, error } = await supabase
+    .from('communication_notes')
+    .insert({
+      communication_id: communicationId,
+      author_id: profile.id,
+      body: body.trim(),
+    })
+    .select('*, author:profiles!communication_notes_author_id_fkey(full_name)')
+    .single();
+
+  if (error) throw new Error(friendlyDbError(error.message));
+  return mapCommunicationNote(data);
 }

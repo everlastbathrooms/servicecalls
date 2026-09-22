@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ClipboardList, Plus, LogOut, CheckCircle2, RefreshCw, Users } from 'lucide-react';
-import { ServiceCall, UserProfile } from '../../types';
+import { ClipboardList, Plus, LogOut, CheckCircle2, RefreshCw, Users, MessageCircle } from 'lucide-react';
+import { CommunicationMethod, CommunicationStatus, CustomerCommunication, ServiceCall, UserProfile } from '../../types';
 import * as api from '../../lib/api';
 import { ServiceCallsTable } from './ServiceCallsTable';
 import { CallDetailOffice } from './CallDetailOffice';
@@ -8,23 +8,30 @@ import { CreateCallModal } from './CreateCallModal';
 import { TeamView } from './TeamView';
 import { InviteCrewModal } from './InviteCrewModal';
 import { EditTeamMemberModal } from './EditTeamMemberModal';
+import { CommunicationsTable } from './CommunicationsTable';
+import { CommunicationDetail } from './CommunicationDetail';
+import { CreateCommunicationModal } from './CreateCommunicationModal';
 
 interface OfficePortalProps {
   currentUser: UserProfile;
   onLogout: () => void;
 }
 
-type OfficeNavigationTab = 'service_calls' | 'team';
+type OfficeNavigationTab = 'service_calls' | 'communications' | 'team';
 
 export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogout }) => {
   const [currentTab, setCurrentTab] = useState<OfficeNavigationTab>('service_calls');
   const [calls, setCalls] = useState<ServiceCall[]>([]);
   const [installers, setInstallers] = useState<UserProfile[]>([]);
   const [team, setTeam] = useState<UserProfile[]>([]);
+  const [communications, setCommunications] = useState<CustomerCommunication[]>([]);
   const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
+  const [selectedCommunicationId, setSelectedCommunicationId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [isCreateCommunicationOpen, setIsCreateCommunicationOpen] = useState(false);
+  const [presetCommServiceCallId, setPresetCommServiceCallId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -38,20 +45,22 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [callsData, installersData, teamData] = await Promise.all([
+      const [callsData, installersData, teamData, communicationsData] = await Promise.all([
         api.getServiceCalls(),
         api.getActiveInstallers(),
-        isAdmin ? api.getAllTeamMembers() : Promise.resolve<UserProfile[]>([]),
+        api.getAllTeamMembers(),
+        api.getCommunications(),
       ]);
       setCalls(callsData);
       setInstallers(installersData);
       setTeam(teamData);
+      setCommunications(communicationsData);
     } catch (err: any) {
       showToast(`Error loading data: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
-  }, [isAdmin]);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -65,6 +74,16 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
   const editingMember = useMemo(
     () => team.find((m) => m.id === editingMemberId) || null,
     [editingMemberId, team]
+  );
+
+  const selectedCommunication = useMemo(
+    () => communications.find((c) => c.id === selectedCommunicationId) || null,
+    [selectedCommunicationId, communications]
+  );
+
+  const officeAndAdminTeam = useMemo(
+    () => team.filter((m) => m.role === 'admin' || m.role === 'office'),
+    [team]
   );
 
   const handleCreateSuccess = async (newCallId: string) => {
@@ -120,6 +139,45 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
     }
   };
 
+  const openCreateCommunication = (serviceCallId?: string) => {
+    setPresetCommServiceCallId(serviceCallId || null);
+    setIsCreateCommunicationOpen(true);
+  };
+
+  const handleCreateCommunicationSuccess = async () => {
+    await loadData();
+    showToast('Ticket logged');
+  };
+
+  const handleViewJobFromCommunication = (serviceCallId: string) => {
+    setSelectedCommunicationId(null);
+    setCurrentTab('service_calls');
+    setSelectedCallId(serviceCallId);
+  };
+
+  const handleUpdateCommunication = async (
+    id: string,
+    updates: { status?: CommunicationStatus; handledBy?: string; method?: CommunicationMethod }
+  ) => {
+    try {
+      await api.updateCommunication(id, updates);
+      await loadData();
+      showToast('Communication updated');
+    } catch (e: any) {
+      alert(`Error: ${e.message}`);
+    }
+  };
+
+  const handleAddCommunicationNote = async (id: string, body: string) => {
+    try {
+      await api.addCommunicationNote(id, body);
+      await loadData();
+      showToast('Update posted');
+    } catch (e: any) {
+      alert(`Error: ${e.message}`);
+    }
+  };
+
   const handleToggleActive = async (member: UserProfile) => {
     try {
       await api.setTeamMemberActive(member.id, !member.isActive);
@@ -131,6 +189,13 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
   };
 
   const openCallsCount = calls.filter((c) => c.status === 'open' || c.status === 'in_progress').length;
+  const openCommunicationsCount = communications.filter((c) => c.status === 'open' || c.status === 'in_progress').length;
+
+  const goToTab = (tab: OfficeNavigationTab) => {
+    setCurrentTab(tab);
+    setSelectedCallId(null);
+    setSelectedCommunicationId(null);
+  };
 
   return (
     <div className="flex h-screen bg-[#FBFBF9] text-[#12161A] overflow-hidden font-sans">
@@ -162,10 +227,7 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
             Work Orders
           </span>
           <button
-            onClick={() => {
-              setCurrentTab('service_calls');
-              setSelectedCallId(null);
-            }}
+            onClick={() => goToTab('service_calls')}
             className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-colors ${
               currentTab === 'service_calls' && !selectedCallId
                 ? 'bg-[#0F5CC4] text-white font-bold'
@@ -183,16 +245,35 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
             )}
           </button>
 
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-3 block mt-6 mb-1.5">
+            Customer Service
+          </span>
+          <button
+            onClick={() => goToTab('communications')}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-colors ${
+              currentTab === 'communications' && !selectedCommunicationId
+                ? 'bg-[#0F5CC4] text-white font-bold'
+                : 'text-gray-300 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <MessageCircle className="w-4 h-4" />
+              <span>Communications</span>
+            </div>
+            {openCommunicationsCount > 0 && (
+              <span className="bg-[#0F5CC4]/20 text-blue-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                {openCommunicationsCount} open
+              </span>
+            )}
+          </button>
+
           {isAdmin && (
             <>
               <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-3 block mt-6 mb-1.5">
                 Manage
               </span>
               <button
-                onClick={() => {
-                  setCurrentTab('team');
-                  setSelectedCallId(null);
-                }}
+                onClick={() => goToTab('team')}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-colors ${
                   currentTab === 'team' && !selectedCallId
                     ? 'bg-[#0F5CC4] text-white font-bold'
@@ -234,8 +315,12 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
           <h2 className="text-sm font-bold text-[#12161A] tracking-tight">
             {selectedCall
               ? `Work Order #${selectedCall.jobNumber}`
+              : selectedCommunication
+              ? `Job #${selectedCommunication.jobNumber} — Customer Service Ticket`
               : currentTab === 'team'
               ? 'Crew & Office Accounts'
+              : currentTab === 'communications'
+              ? 'Customer Service Log'
               : 'All Service Calls'}
           </h2>
 
@@ -247,13 +332,23 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
             >
               <RefreshCw className="w-4 h-4" />
             </button>
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="px-3.5 py-1.5 bg-[#0F5CC4] hover:bg-[#0E52B0] text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-xs transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Create Call</span>
-            </button>
+            {currentTab === 'communications' && !selectedCommunication ? (
+              <button
+                onClick={() => openCreateCommunication()}
+                className="px-3.5 py-1.5 bg-[#0F5CC4] hover:bg-[#0E52B0] text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-xs transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Log Ticket</span>
+              </button>
+            ) : currentTab === 'service_calls' && !selectedCall ? (
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="px-3.5 py-1.5 bg-[#0F5CC4] hover:bg-[#0E52B0] text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-xs transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create Call</span>
+              </button>
+            ) : null}
           </div>
         </header>
 
@@ -269,6 +364,16 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
                 onAddNote={handleAddNote}
                 onUploadAttachment={handleUploadAttachment}
                 onDeleteCall={handleDeleteCall}
+                onLogCommunication={() => openCreateCommunication(selectedCall.id)}
+              />
+            ) : selectedCommunication ? (
+              <CommunicationDetail
+                communication={selectedCommunication}
+                team={officeAndAdminTeam}
+                onBack={() => setSelectedCommunicationId(null)}
+                onUpdate={handleUpdateCommunication}
+                onAddNote={handleAddCommunicationNote}
+                onViewJob={handleViewJobFromCommunication}
               />
             ) : currentTab === 'team' && isAdmin ? (
               <TeamView
@@ -276,6 +381,12 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
                 onInvite={() => setIsInviteModalOpen(true)}
                 onToggleActive={handleToggleActive}
                 onEditMember={(member) => setEditingMemberId(member.id)}
+              />
+            ) : currentTab === 'communications' ? (
+              <CommunicationsTable
+                communications={communications}
+                onSelect={(c) => setSelectedCommunicationId(c.id)}
+                onCreate={() => openCreateCommunication()}
               />
             ) : (
               <ServiceCallsTable
@@ -293,6 +404,18 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={handleCreateSuccess}
+      />
+
+      <CreateCommunicationModal
+        isOpen={isCreateCommunicationOpen}
+        currentUser={currentUser}
+        serviceCalls={calls}
+        presetServiceCallId={presetCommServiceCallId}
+        onClose={() => {
+          setIsCreateCommunicationOpen(false);
+          setPresetCommServiceCallId(null);
+        }}
+        onSuccess={handleCreateCommunicationSuccess}
       />
 
       {isAdmin && (

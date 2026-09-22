@@ -32,6 +32,7 @@ Three roles, stored in `profiles.role`: `admin`, `office`, `installer`.
 | Add notes | ✅ | ✅ (shared or internal-only) | ✅ (shared only) |
 | Invite new crew/office accounts | ✅ **only** | ❌ | ❌ |
 | Deactivate/reactivate accounts | ✅ **only** | ❌ | ❌ |
+| Log / view / update customer service tickets (always tied to a job) | ✅ | ✅ | ❌ — **no policy grants installers any access at all**, RLS defaults to deny (see §3a) |
 
 **Enforcement lives in the database, not the UI.** `supabase/schema.sql` has Row-Level Security (RLS) policies on every table — an installer's Supabase query for `service_calls` is *rewritten by Postgres* to only return rows where `installer_id = auth.uid()`. Never rely on hiding a button in React as the actual security boundary. If you add a new table or a new query path, it needs an RLS policy before it needs a UI.
 
@@ -47,6 +48,17 @@ The one write path installers get on `service_calls` is the `installer_complete_
 - **`attachments`** — photos/videos, stored in the private Supabase Storage bucket `service-call-media`, one row per file. `phase` is `'reported'` (office/customer photos) or `'resolution'` (installer's after-photos). Access is via **signed URLs only** (1-hour TTL, see `getSignedUrl` in `src/lib/api.ts`) — the bucket is never public.
 - **`service_call_notes`** — a note thread on a call. `visibility` is `'shared'` (everyone who can see the call) or `'internal'` (office/admin only — installers cannot post or read internal notes).
 - **`notification_log`** — an audit trail of every email attempt (sent or failed), written by the `send-notification` edge function, not by the client directly.
+
+### 3a. Customer Service Log (office/admin only, always tied to a job)
+
+Added after Milestone 1 shipped — an internal ticket log of customer service communications. Per the client (confirmed over chat, see project history if you need the exact wording): **"Always related to a job, and its just internal so we can keep track of every request."** This is NOT a general/standalone communications log and NOT client-facing — there are no client accounts, and nothing here is ever communicated *through* the portal. Office/admin log that "client X called about job #Y," track it like a ticket (open → updates → closed), and that's it.
+
+- **`customer_communications`** — `service_call_id` is a **required** FK to `service_calls` (`ON DELETE CASCADE`). There is no separate customer name/phone/email on this table — the client's identity comes from `service_call.client_id`, not duplicated here. `method` (`phone`/`email`/`text`/`in_person`/`other`), `status` (`open`/`in_progress`/`resolved`/`closed`), `handled_by` (a `profiles` id, must be admin/office).
+- **`communication_notes`** — a timestamped update thread per ticket, same shape as `service_call_notes` but **no shared/internal split** — the whole table is already office/admin-only, so there's nothing to split visibility between.
+- **No email is sent for this feature.** Don't wire it into `send-notification`/`notification_log` unless asked.
+- **Installers get zero access** — not just hidden nav, there is no RLS policy for `installer` on either table at all, and RLS defaults to deny. See `supabase/migrations/20260922000000_customer_communications_log.sql`.
+- **Two entry points, same data**: a standalone "Communications" tab in `OfficePortal.tsx` (visible to both office and admin, unlike "Team" which is admin-only) listing every ticket across all jobs, *and* a "Log Customer Service" button directly on `CallDetailOffice.tsx` that opens the same create modal pre-filled with that job (`presetServiceCallId`, locked so it can't be changed). Keep both in sync if you touch the create flow.
+- UI lives in `src/components/office/{CommunicationsTable,CommunicationDetail,CreateCommunicationModal}.tsx`.
 
 ---
 
@@ -124,11 +136,16 @@ src/
   components/
     auth/                        LoginView, SetPasswordView
     installer/                   phone-first views: list, detail, complete/blocked modals
-    office/                      desktop views: table, detail, create-call, invite, team
+    office/                      desktop views: table, detail, create-call, invite, team,
+                                  communications log (table, detail, create modal)
     common/                      MediaLightbox (shared photo/video viewer)
 
 supabase/
-  schema.sql                     tables, RLS policies, RPC, trigger — the actual security boundary
+  schema.sql                     the full "fresh setup" reference — every table, RLS policy,
+                                  RPC, and trigger, kept in sync with migrations/ below
+  migrations/                    incremental diffs for an already-running project
+                                  (`supabase db push`) — schema.sql already has the same DDL,
+                                  don't let the two drift apart
   functions/
     _shared/                     cors.ts, keys.ts — reused by every edge function
     invite-crew/                 admin-only: creates a user via Auth Admin API
@@ -144,3 +161,4 @@ supabase/
 - **Keep error messages human-readable** (§8, last bullet) — extend the existing translation maps rather than letting raw driver errors leak to a `alert()`.
 - **New email events** go through the existing `send-notification` function and `notification_log` table — add the event type to the `CHECK` constraint in `schema.sql` *and* to the edge function's `EventType` union, not just one of the two.
 - **Ask before expanding scope.** If a request sounds like it belongs to §7's excluded list, or changes a hardcoded value in §6, confirm with the user first rather than guessing at what they'd want.
+- **New database changes get both a migration file** (`supabase/migrations/<timestamp>_description.sql`, applied incrementally to the live project) **and the same DDL appended to `schema.sql`** (the from-scratch reference). Keep them in sync — don't add one without the other.

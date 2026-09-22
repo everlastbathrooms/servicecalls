@@ -88,3 +88,34 @@ export interface NotificationLog {
   error?: string | null;
   createdAt: string;
 }
+
+// ---------- Customer Communications Log (office/admin only) ----------
+
+export type CommunicationMethod = 'phone' | 'email' | 'text' | 'in_person' | 'other';
+export type CommunicationStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+
+export interface CommunicationNote {
+  id: string;
+  communicationId: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface CustomerCommunication {
+  id: string;
+  serviceCallId: string;
+  jobNumber?: string; // from the linked service call, for display
+  clientName?: string; // from the linked service call's client, for display
+  dateReceived: string; // YYYY-MM-DD
+  method: CommunicationMethod;
+  status: CommunicationStatus;
+  handledBy: string;
+  handledByName?: string;
+  summary: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  notes?: CommunicationNote[];
+}

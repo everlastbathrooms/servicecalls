@@ -5,6 +5,8 @@ import {
   Filter,
   Plus,
   ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
   Paperclip,
   CheckCircle2,
   AlertTriangle,
@@ -52,7 +54,18 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
   const [responsibilityFilter, setResponsibilityFilter] = useState('all');
 
   // Sorting
-  const [sortField, setSortField] = useState<'reportedDate' | 'jobNumber' | 'priority' | 'daysOpen'>('reportedDate');
+  type SortField =
+    | 'jobNumber'
+    | 'client'
+    | 'reportedDate'
+    | 'daysOpen'
+    | 'installer'
+    | 'installDate'
+    | 'priority'
+    | 'responsibility'
+    | 'billing'
+    | 'status';
+  const [sortField, setSortField] = useState<SortField>('reportedDate');
   const [sortAsc, setSortAsc] = useState(false);
 
   // Filter logic
@@ -114,6 +127,31 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
         const daysB = getDaysOpen(b.reportedDate);
         return sortAsc ? daysA - daysB : daysB - daysA;
       }
+      if (sortField === 'client') {
+        const cmp = (a.client?.name || '').localeCompare(b.client?.name || '');
+        return sortAsc ? cmp : -cmp;
+      }
+      if (sortField === 'installer') {
+        const cmp = (a.installer?.fullName || '').localeCompare(b.installer?.fullName || '');
+        return sortAsc ? cmp : -cmp;
+      }
+      if (sortField === 'installDate') {
+        const timeA = a.installDate ? new Date(a.installDate).getTime() : Infinity;
+        const timeB = b.installDate ? new Date(b.installDate).getTime() : Infinity;
+        return sortAsc ? timeA - timeB : timeB - timeA;
+      }
+      if (sortField === 'responsibility') {
+        const cmp = a.responsibility.localeCompare(b.responsibility);
+        return sortAsc ? cmp : -cmp;
+      }
+      if (sortField === 'billing') {
+        const cmp = a.billing.localeCompare(b.billing);
+        return sortAsc ? cmp : -cmp;
+      }
+      if (sortField === 'status') {
+        const cmp = a.status.localeCompare(b.status);
+        return sortAsc ? cmp : -cmp;
+      }
       return 0;
     });
   }, [
@@ -127,13 +165,22 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
     sortAsc,
   ]);
 
-  const toggleSort = (field: 'reportedDate' | 'jobNumber' | 'priority' | 'daysOpen') => {
+  const toggleSort = (field: SortField) => {
     if (sortField === field) {
       setSortAsc(!sortAsc);
     } else {
       setSortField(field);
       setSortAsc(false);
     }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 text-gray-400" />;
+    return sortAsc ? (
+      <ChevronUp className="w-3.5 h-3.5 text-[#0F5CC4]" />
+    ) : (
+      <ChevronDown className="w-3.5 h-3.5 text-[#0F5CC4]" />
+    );
   };
 
   return (
@@ -263,47 +310,95 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
               <tr>
                 <th className="w-2.5 p-0"></th>
                 <th
-                  className="py-3 px-3 cursor-pointer hover:text-[#12161A]"
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'jobNumber' ? 'text-[#12161A]' : ''}`}
                   onClick={() => toggleSort('jobNumber')}
                 >
                   <div className="flex items-center gap-1">
                     <span>Job #</span>
-                    <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    <SortIcon field="jobNumber" />
                   </div>
                 </th>
-                <th className="py-3 px-3">Client</th>
                 <th
-                  className="py-3 px-3 cursor-pointer hover:text-[#12161A]"
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'client' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('client')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Client</span>
+                    <SortIcon field="client" />
+                  </div>
+                </th>
+                <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'reportedDate' ? 'text-[#12161A]' : ''}`}
                   onClick={() => toggleSort('reportedDate')}
                 >
                   <div className="flex items-center gap-1">
                     <span>Reported</span>
-                    <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    <SortIcon field="reportedDate" />
                   </div>
                 </th>
                 <th
-                  className="py-3 px-3 cursor-pointer hover:text-[#12161A]"
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'daysOpen' ? 'text-[#12161A]' : ''}`}
                   onClick={() => toggleSort('daysOpen')}
                 >
                   <div className="flex items-center gap-1">
                     <span>Days Open</span>
-                    <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    <SortIcon field="daysOpen" />
                   </div>
                 </th>
-                <th className="py-3 px-3">Assigned Crew</th>
-                <th className="py-3 px-3">Install Date</th>
                 <th
-                  className="py-3 px-3 cursor-pointer hover:text-[#12161A]"
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'installer' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('installer')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Assigned Crew</span>
+                    <SortIcon field="installer" />
+                  </div>
+                </th>
+                <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'installDate' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('installDate')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Install Date</span>
+                    <SortIcon field="installDate" />
+                  </div>
+                </th>
+                <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'priority' ? 'text-[#12161A]' : ''}`}
                   onClick={() => toggleSort('priority')}
                 >
                   <div className="flex items-center gap-1">
                     <span>Priority</span>
-                    <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    <SortIcon field="priority" />
                   </div>
                 </th>
-                <th className="py-3 px-3">Responsibility</th>
-                <th className="py-3 px-3">Billing</th>
-                <th className="py-3 px-3">Status</th>
+                <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'responsibility' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('responsibility')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Responsibility</span>
+                    <SortIcon field="responsibility" />
+                  </div>
+                </th>
+                <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'billing' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('billing')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Billing</span>
+                    <SortIcon field="billing" />
+                  </div>
+                </th>
+                <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'status' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('status')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Status</span>
+                    <SortIcon field="status" />
+                  </div>
+                </th>
                 <th className="py-3 px-3 text-right"></th>
               </tr>
             </thead>

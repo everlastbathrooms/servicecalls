@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, Plus, ChevronRight } from 'lucide-react';
+import { Search, Filter, Plus, ArrowUpDown, ChevronUp, ChevronDown, ChevronRight } from 'lucide-react';
 import { CustomerCommunication } from '../../types';
 import {
   formatDate,
@@ -23,26 +23,77 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
   const [statusFilter, setStatusFilter] = useState('all');
   const [methodFilter, setMethodFilter] = useState('all');
 
+  type SortField = 'dateReceived' | 'jobNumber' | 'method' | 'summary' | 'handledBy' | 'status';
+  const [sortField, setSortField] = useState<SortField>('dateReceived');
+  const [sortAsc, setSortAsc] = useState(false);
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortField(field);
+      setSortAsc(false);
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 text-gray-400" />;
+    return sortAsc ? (
+      <ChevronUp className="w-3.5 h-3.5 text-[#0F5CC4]" />
+    ) : (
+      <ChevronDown className="w-3.5 h-3.5 text-[#0F5CC4]" />
+    );
+  };
+
   const filtered = useMemo(() => {
-    return communications.filter((c) => {
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesJob = (c.jobNumber || '').toLowerCase().includes(q);
-        const matchesClient = (c.clientName || '').toLowerCase().includes(q);
-        const matchesSummary = c.summary.toLowerCase().includes(q);
-        if (!matchesJob && !matchesClient && !matchesSummary) return false;
-      }
-      if (statusFilter !== 'all') {
-        if (statusFilter === 'active') {
-          if (c.status === 'resolved' || c.status === 'closed') return false;
-        } else if (c.status !== statusFilter) {
-          return false;
+    return communications
+      .filter((c) => {
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const matchesJob = (c.jobNumber || '').toLowerCase().includes(q);
+          const matchesClient = (c.clientName || '').toLowerCase().includes(q);
+          const matchesSummary = c.summary.toLowerCase().includes(q);
+          if (!matchesJob && !matchesClient && !matchesSummary) return false;
         }
-      }
-      if (methodFilter !== 'all' && c.method !== methodFilter) return false;
-      return true;
-    });
-  }, [communications, searchQuery, statusFilter, methodFilter]);
+        if (statusFilter !== 'all') {
+          if (statusFilter === 'active') {
+            if (c.status === 'resolved' || c.status === 'closed') return false;
+          } else if (c.status !== statusFilter) {
+            return false;
+          }
+        }
+        if (methodFilter !== 'all' && c.method !== methodFilter) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortField === 'dateReceived') {
+          const timeA = new Date(a.dateReceived).getTime();
+          const timeB = new Date(b.dateReceived).getTime();
+          return sortAsc ? timeA - timeB : timeB - timeA;
+        }
+        if (sortField === 'jobNumber') {
+          const cmp = (a.jobNumber || '').localeCompare(b.jobNumber || '');
+          return sortAsc ? cmp : -cmp;
+        }
+        if (sortField === 'method') {
+          const cmp = a.method.localeCompare(b.method);
+          return sortAsc ? cmp : -cmp;
+        }
+        if (sortField === 'summary') {
+          const cmp = a.summary.localeCompare(b.summary);
+          return sortAsc ? cmp : -cmp;
+        }
+        if (sortField === 'handledBy') {
+          const cmp = (a.handledByName || '').localeCompare(b.handledByName || '');
+          return sortAsc ? cmp : -cmp;
+        }
+        if (sortField === 'status') {
+          const cmp = a.status.localeCompare(b.status);
+          return sortAsc ? cmp : -cmp;
+        }
+        return 0;
+      });
+  }, [communications, searchQuery, statusFilter, methodFilter, sortField, sortAsc]);
 
   return (
     <div className="space-y-4">
@@ -120,12 +171,60 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-[#F0F2F0] text-[#3A424B] border-b border-[#DFE2DE] uppercase tracking-wider font-semibold">
               <tr>
-                <th className="py-3 px-3">Date Received</th>
-                <th className="py-3 px-3">Job / Client</th>
-                <th className="py-3 px-3">Method</th>
-                <th className="py-3 px-3">Summary</th>
-                <th className="py-3 px-3">Handled By</th>
-                <th className="py-3 px-3">Status</th>
+                <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'dateReceived' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('dateReceived')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Date Received</span>
+                    <SortIcon field="dateReceived" />
+                  </div>
+                </th>
+                <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'jobNumber' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('jobNumber')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Job / Client</span>
+                    <SortIcon field="jobNumber" />
+                  </div>
+                </th>
+                <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'method' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('method')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Method</span>
+                    <SortIcon field="method" />
+                  </div>
+                </th>
+                <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'summary' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('summary')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Summary</span>
+                    <SortIcon field="summary" />
+                  </div>
+                </th>
+                <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'handledBy' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('handledBy')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Handled By</span>
+                    <SortIcon field="handledBy" />
+                  </div>
+                </th>
+                <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'status' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('status')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Status</span>
+                    <SortIcon field="status" />
+                  </div>
+                </th>
                 <th className="py-3 px-3 text-right"></th>
               </tr>
             </thead>

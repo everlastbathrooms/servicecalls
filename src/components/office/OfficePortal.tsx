@@ -178,6 +178,17 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
     }
   };
 
+  const handleDeleteCommunication = async (id: string) => {
+    try {
+      await api.deleteCommunication(id);
+      setSelectedCommunicationId(null);
+      await loadData();
+      showToast('Ticket deleted');
+    } catch (e: any) {
+      alert(`Error: ${e.message}`);
+    }
+  };
+
   const handleToggleActive = async (member: UserProfile) => {
     try {
       await api.setTeamMemberActive(member.id, !member.isActive);
@@ -370,10 +381,12 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
               <CommunicationDetail
                 communication={selectedCommunication}
                 team={officeAndAdminTeam}
+                isAdmin={isAdmin}
                 onBack={() => setSelectedCommunicationId(null)}
                 onUpdate={handleUpdateCommunication}
                 onAddNote={handleAddCommunicationNote}
                 onViewJob={handleViewJobFromCommunication}
+                onDeleteCommunication={handleDeleteCommunication}
               />
             ) : currentTab === 'team' && isAdmin ? (
               <TeamView

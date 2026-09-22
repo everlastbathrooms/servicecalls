@@ -424,6 +424,12 @@ DROP POLICY IF EXISTS "office and admin update communications" ON customer_commu
 CREATE POLICY "office and admin update communications" ON customer_communications FOR UPDATE
 USING (auth_role() IN ('admin', 'office'));
 
+-- Deleting a ticket is destructive (cascades to its notes), so — unlike
+-- read/insert/update above — it's restricted to admins only.
+DROP POLICY IF EXISTS "admin delete communications" ON customer_communications;
+CREATE POLICY "admin delete communications" ON customer_communications FOR DELETE
+USING (auth_role() = 'admin');
+
 DROP POLICY IF EXISTS "office and admin read communication notes" ON communication_notes;
 CREATE POLICY "office and admin read communication notes" ON communication_notes FOR SELECT
 USING (auth_role() IN ('admin', 'office'));

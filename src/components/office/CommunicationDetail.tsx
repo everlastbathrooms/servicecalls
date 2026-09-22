@@ -1,24 +1,28 @@
 import React, { useState } from 'react';
-import { ArrowLeft, MessageSquare, CheckCircle2, ExternalLink } from 'lucide-react';
+import { ArrowLeft, MessageSquare, CheckCircle2, ExternalLink, Trash2 } from 'lucide-react';
 import { CommunicationMethod, CommunicationStatus, CustomerCommunication, UserProfile } from '../../types';
 import { formatDate, formatRelativeDate, getCommunicationMethodLabel, getCommunicationStatusBadge } from '../../lib/utils';
 
 interface CommunicationDetailProps {
   communication: CustomerCommunication;
   team: UserProfile[];
+  isAdmin: boolean;
   onBack: () => void;
   onUpdate: (id: string, updates: { status?: CommunicationStatus; handledBy?: string; method?: CommunicationMethod }) => void;
   onAddNote: (id: string, body: string) => void;
   onViewJob?: (serviceCallId: string) => void;
+  onDeleteCommunication: (id: string) => void;
 }
 
 export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
   communication,
   team,
+  isAdmin,
   onBack,
   onUpdate,
   onAddNote,
   onViewJob,
+  onDeleteCommunication,
 }) => {
   const [status, setStatus] = useState(communication.status);
   const [handledBy, setHandledBy] = useState(communication.handledBy);
@@ -39,6 +43,12 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
     if (!noteBody.trim()) return;
     onAddNote(communication.id, noteBody.trim());
     setNoteBody('');
+  };
+
+  const handleDelete = () => {
+    if (window.confirm(`Delete this ticket for #${communication.jobNumber}? This cannot be undone.`)) {
+      onDeleteCommunication(communication.id);
+    }
   };
 
   return (
@@ -69,6 +79,15 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
             <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
               <CheckCircle2 className="w-4 h-4" /> Saved
             </span>
+          )}
+          {isAdmin && (
+            <button
+              onClick={handleDelete}
+              title="Delete ticket"
+              className="p-2 text-[#6B7A88] hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           )}
           <button
             onClick={handleSave}

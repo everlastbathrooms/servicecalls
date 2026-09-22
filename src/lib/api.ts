@@ -821,6 +821,17 @@ export async function updateCommunication(
   return mapCommunication(data);
 }
 
+/**
+ * Permanently deletes a logged customer service ticket (and, via ON DELETE
+ * CASCADE, its update notes). Restricted to admins by the
+ * "admin delete communications" RLS policy — this call fails with a
+ * Postgres permission error for any other role.
+ */
+export async function deleteCommunication(id: string): Promise<void> {
+  const { error } = await supabase.from('customer_communications').delete().eq('id', id);
+  if (error) throw new Error(friendlyDbError(error.message));
+}
+
 export async function addCommunicationNote(communicationId: string, body: string): Promise<CommunicationNote> {
   const profile = await getCurrentProfile();
   if (!profile) throw new Error('Not authenticated.');

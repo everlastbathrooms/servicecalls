@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, CheckCircle2, AlertCircle } from 'lucide-react';
-import { CommunicationMethod, ServiceCall, UserProfile } from '../../types';
+import { X, Plus, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Client, CommunicationMethod, ServiceCall, UserProfile } from '../../types';
 import * as api from '../../lib/api';
 
 interface CreateCommunicationModalProps {
@@ -21,7 +21,20 @@ export const CreateCommunicationModal: React.FC<CreateCommunicationModalProps> =
   onSuccess,
 }) => {
   const [team, setTeam] = useState<UserProfile[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [clientQuery, setClientQuery] = useState('');
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+  const [isCreatingClient, setIsCreatingClient] = useState(false);
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientPhone, setNewClientPhone] = useState('');
+  const [newClientAddress, setNewClientAddress] = useState('');
+
   const [serviceCallId, setServiceCallId] = useState('');
+  const [isCreatingJob, setIsCreatingJob] = useState(false);
+  const [newJobNumber, setNewJobNumber] = useState('');
+
   const [dateReceived, setDateReceived] = useState(new Date().toISOString().split('T')[0]);
   const [method, setMethod] = useState<CommunicationMethod>('phone');
   const [handledBy, setHandledBy] = useState(currentUser.id);
@@ -31,38 +44,133 @@ export const CreateCommunicationModal: React.FC<CreateCommunicationModalProps> =
 
   useEffect(() => {
     if (!isOpen) return;
+
     api.getAllTeamMembers().then((members) => {
       setTeam(members.filter((m) => m.role === 'admin' || m.role === 'office'));
     });
-    setServiceCallId(presetServiceCallId || serviceCalls[0]?.id || '');
-  }, [isOpen, presetServiceCallId, serviceCalls]);
+    api.getClients().then(setClients);
 
-  const sortedCalls = useMemo(
+    const presetCall = presetServiceCallId ? serviceCalls.find((c) => c.id === presetServiceCallId) : null;
+    setSelectedClientId(presetCall?.clientId || '');
+    setClientQuery(presetCall?.client?.name || '');
+    setServiceCallId(presetServiceCallId || '');
+    setIsClientDropdownOpen(false);
+    setIsCreatingClient(false);
+    setNewClientName('');
+    setNewClientPhone('');
+    setNewClientAddress('');
+    setIsCreatingJob(false);
+    setNewJobNumber('');
+    setDateReceived(new Date().toISOString().split('T')[0]);
+    setMethod('phone');
+    setHandledBy(currentUser.id);
+    setSummary('');
+    setError('');
+  }, [isOpen, presetServiceCallId, serviceCalls, currentUser.id]);
+
+  const clientJobs = useMemo(
     () =>
-      [...serviceCalls].sort(
-        (a, b) => new Date(b.reportedDate).getTime() - new Date(a.reportedDate).getTime()
-      ),
-    [serviceCalls]
+      selectedClientId
+        ? serviceCalls
+            .filter((c) => c.clientId === selectedClientId)
+            .sort((a, b) => new Date(b.reportedDate).getTime() - new Date(a.reportedDate).getTime())
+        : [],
+    [serviceCalls, selectedClientId]
   );
 
   if (!isOpen) return null;
 
+  const trimmedClientQuery = clientQuery.trim();
+  const filteredClients = trimmedClientQuery
+    ? clients.filter((c) => c.name.toLowerCase().includes(trimmedClientQuery.toLowerCase()))
+    : clients;
+
+  const handleSelectClient = (client: Client) => {
+    setSelectedClientId(client.id);
+    setClientQuery(client.name);
+    setIsClientDropdownOpen(false);
+    setIsCreatingClient(false);
+
+    const existingJobs = serviceCalls
+      .filter((c) => c.clientId === client.id)
+      .sort((a, b) => new Date(b.reportedDate).getTime() - new Date(a.reportedDate).getTime());
+
+    if (existingJobs.length > 0) {
+      setServiceCallId(existingJobs[0].id);
+      setIsCreatingJob(false);
+    } else {
+      setServiceCallId('');
+      setIsCreatingJob(true);
+    }
+    setNewJobNumber('');
+  };
+
+  const handleStartCreatingClient = () => {
+    setIsCreatingClient(true);
+    setNewClientName(trimmedClientQuery);
+    setIsClientDropdownOpen(false);
+    setSelectedClientId('');
+    setServiceCallId('');
+    setIsCreatingJob(true);
+    setNewJobNumber('');
+  };
+
+  const handleSearchExistingClient = () => {
+    setIsCreatingClient(false);
+    setNewClientName('');
+    setNewClientPhone('');
+    setNewClientAddress('');
+    setServiceCallId('');
+    setIsCreatingJob(false);
+    setNewJobNumber('');
+  };
+
+  const canSubmit = presetServiceCallId
+    ? !!serviceCallId
+    : (isCreatingClient ? !!newClientName.trim() : !!selectedClientId) &&
+      (isCreatingJob ? !!newJobNumber.trim() : !!serviceCallId);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!serviceCallId) {
-      setError('Please select the job this communication is about.');
-      return;
-    }
     if (!summary.trim()) {
       setError('A summary of the communication is required.');
+      return;
+    }
+    if (!canSubmit) {
+      setError('Please provide the client and job this ticket is about.');
       return;
     }
 
     setError('');
     setIsSubmitting(true);
     try {
+      let finalClientId = selectedClientId;
+      if (!presetServiceCallId && isCreatingClient) {
+        const client = await api.createClient({
+          name: newClientName.trim(),
+          phone: newClientPhone.trim() || undefined,
+          address: newClientAddress.trim() || undefined,
+        });
+        finalClientId = client.id;
+      }
+
+      let finalServiceCallId = serviceCallId;
+      if (!presetServiceCallId && isCreatingJob) {
+        const newCall = await api.createServiceCall({
+          jobNumber: newJobNumber.trim(),
+          clientId: finalClientId,
+          installerId: null,
+          reportedDate: dateReceived,
+          priority: 'mid',
+          description: summary.trim(),
+          responsibility: 'installer',
+          billing: 'undecided',
+        });
+        finalServiceCallId = newCall.id;
+      }
+
       await api.createCommunication({
-        serviceCallId,
+        serviceCallId: finalServiceCallId,
         dateReceived,
         method,
         handledBy,
@@ -70,9 +178,6 @@ export const CreateCommunicationModal: React.FC<CreateCommunicationModalProps> =
       });
       onSuccess();
       onClose();
-      setSummary('');
-      setMethod('phone');
-      setHandledBy(currentUser.id);
     } catch (err: any) {
       setError(err.message || 'Failed to log communication.');
     } finally {
@@ -104,28 +209,197 @@ export const CreateCommunicationModal: React.FC<CreateCommunicationModalProps> =
         )}
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#3A424B] mb-1">
-              Job <span className="text-red-500">*</span>
-            </label>
-            <select
-              required
-              value={serviceCallId}
-              onChange={(e) => setServiceCallId(e.target.value)}
-              disabled={!!presetServiceCallId}
-              className="w-full text-xs p-2.5 bg-white border border-[#DFE2DE] rounded-lg focus:border-[#0F5CC4] outline-none font-medium disabled:bg-[#F0F2F0] disabled:text-[#6B7A88]"
-            >
-              {sortedCalls.length === 0 && <option value="">No service calls yet</option>}
-              {sortedCalls.map((c) => (
-                <option key={c.id} value={c.id}>
-                  #{c.jobNumber} — {c.client?.name || 'Customer'}
-                </option>
-              ))}
-            </select>
-            <p className="text-[10px] text-[#6B7A88] mt-1">
-              Every communication is tied to a job — pick the one this contact is about.
-            </p>
-          </div>
+          {presetServiceCallId ? (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#3A424B] mb-1">Job</label>
+              <div className="w-full text-xs p-2.5 bg-[#F0F2F0] border border-[#DFE2DE] rounded-lg font-medium text-[#3A424B]">
+                {(() => {
+                  const call = serviceCalls.find((c) => c.id === presetServiceCallId);
+                  return call ? `#${call.jobNumber} — ${call.client?.name || 'Customer'}` : 'Selected job';
+                })()}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#3A424B]">
+                    Client <span className="text-red-500">*</span>
+                  </label>
+                  {isCreatingClient && clients.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleSearchExistingClient}
+                      className="text-xs text-[#0F5CC4] font-semibold hover:underline"
+                    >
+                      Search existing instead
+                    </button>
+                  )}
+                </div>
+
+                {isCreatingClient ? (
+                  <div className="p-3 bg-[#FBFBF9] rounded-xl border border-[#DFE2DE] space-y-2.5">
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Client Full Name (e.g. Jason Kole (Phase 1))"
+                      value={newClientName}
+                      onChange={(e) => setNewClientName(e.target.value)}
+                      className="w-full text-xs p-2.5 bg-white border border-[#DFE2DE] rounded-lg focus:border-[#0F5CC4] outline-none"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Phone (e.g. 555-412-8832)"
+                        value={newClientPhone}
+                        onChange={(e) => setNewClientPhone(e.target.value)}
+                        className="text-xs p-2 bg-white border border-[#DFE2DE] rounded-lg focus:border-[#0F5CC4] outline-none"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Address (e.g. Newton, MA)"
+                        value={newClientAddress}
+                        onChange={(e) => setNewClientAddress(e.target.value)}
+                        className="text-xs p-2 bg-white border border-[#DFE2DE] rounded-lg focus:border-[#0F5CC4] outline-none"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Type a client name to search..."
+                      value={clientQuery}
+                      onChange={(e) => {
+                        setClientQuery(e.target.value);
+                        setSelectedClientId('');
+                        setServiceCallId('');
+                        setIsCreatingJob(false);
+                        setIsClientDropdownOpen(true);
+                      }}
+                      onBlur={() => setTimeout(() => setIsClientDropdownOpen(false), 150)}
+                      className="w-full text-xs p-2.5 bg-white border border-[#DFE2DE] rounded-lg focus:border-[#0F5CC4] outline-none font-medium"
+                    />
+                    {isClientDropdownOpen && trimmedClientQuery && (
+                      <div className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-[#DFE2DE] rounded-lg shadow-lg">
+                        {filteredClients.length > 0 ? (
+                          filteredClients.map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => handleSelectClient(c)}
+                              className="w-full text-left px-3 py-2 text-xs hover:bg-[#FBFBF9] border-b border-[#DFE2DE] last:border-b-0"
+                            >
+                              <span className="font-medium text-[#12161A]">{c.name}</span>
+                              {(c.phone || c.address) && (
+                                <span className="block text-[10px] text-[#6B7A88]">
+                                  {[c.phone, c.address].filter(Boolean).join(' • ')}
+                                </span>
+                              )}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-xs text-[#6B7A88]">No matching clients.</div>
+                        )}
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={handleStartCreatingClient}
+                          className="w-full text-left px-3 py-2 text-xs font-semibold text-[#0F5CC4] hover:bg-[#0F5CC4]/5 flex items-center gap-1.5 border-t border-[#DFE2DE]"
+                        >
+                          <Plus className="w-3.5 h-3.5 shrink-0" />
+                          <span>
+                            {trimmedClientQuery ? `Create new client "${trimmedClientQuery}"` : 'Create new client'}
+                          </span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#3A424B]">
+                    Job <span className="text-red-500">*</span>
+                  </label>
+                  {!isCreatingJob && clientJobs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreatingJob(true);
+                        setServiceCallId('');
+                      }}
+                      className="text-xs text-[#0F5CC4] font-semibold hover:underline"
+                    >
+                      New job instead
+                    </button>
+                  )}
+                  {isCreatingJob && clientJobs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreatingJob(false);
+                        setServiceCallId(clientJobs[0].id);
+                        setNewJobNumber('');
+                      }}
+                      className="text-xs text-[#0F5CC4] font-semibold hover:underline"
+                    >
+                      Pick existing job instead
+                    </button>
+                  )}
+                </div>
+
+                {isCreatingClient ? (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Job # (e.g. 1537)"
+                      value={newJobNumber}
+                      onChange={(e) => setNewJobNumber(e.target.value)}
+                      className="w-full text-xs p-2.5 bg-white border border-[#DFE2DE] rounded-lg focus:border-[#0F5CC4] outline-none font-mono font-bold"
+                    />
+                    <p className="text-[10px] text-[#6B7A88] mt-1">
+                      New client, so we'll create a job record for them too.
+                    </p>
+                  </>
+                ) : !selectedClientId ? (
+                  <div className="w-full text-xs p-2.5 bg-[#F0F2F0] border border-[#DFE2DE] rounded-lg text-[#6B7A88]">
+                    Pick a client above first.
+                  </div>
+                ) : isCreatingJob ? (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Job # (e.g. 1537)"
+                      value={newJobNumber}
+                      onChange={(e) => setNewJobNumber(e.target.value)}
+                      className="w-full text-xs p-2.5 bg-white border border-[#DFE2DE] rounded-lg focus:border-[#0F5CC4] outline-none font-mono font-bold"
+                    />
+                    <p className="text-[10px] text-[#6B7A88] mt-1">
+                      {clientJobs.length === 0
+                        ? "This client has no jobs yet, so we'll create one for this ticket."
+                        : "We'll create a new job record for this client."}
+                    </p>
+                  </>
+                ) : (
+                  <select
+                    required
+                    value={serviceCallId}
+                    onChange={(e) => setServiceCallId(e.target.value)}
+                    className="w-full text-xs p-2.5 bg-white border border-[#DFE2DE] rounded-lg focus:border-[#0F5CC4] outline-none font-medium"
+                  >
+                    {clientJobs.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        #{c.jobNumber} — {c.reportedDate}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </>
+          )}
 
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -196,7 +470,7 @@ export const CreateCommunicationModal: React.FC<CreateCommunicationModalProps> =
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !serviceCallId}
+              disabled={isSubmitting || !canSubmit}
               className="px-6 py-2.5 bg-[#0F5CC4] hover:bg-[#0E52B0] text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm disabled:opacity-50 transition-colors"
             >
               <CheckCircle2 className="w-4 h-4" />

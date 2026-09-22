@@ -258,6 +258,41 @@ export async function setTeamMemberActive(userId: string, isActive: boolean): Pr
 }
 
 /**
+ * Updates a crew/office member's name, phone, and role. Covered by the
+ * "admin office manage profiles" RLS policy on profiles (UPDATE), so this
+ * is a direct client-side write rather than an Edge Function call.
+ */
+export async function updateTeamMember(
+  userId: string,
+  input: { fullName: string; phone?: string | null; role: UserRole }
+): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      full_name: input.fullName.trim(),
+      phone: input.phone?.trim() || null,
+      role: input.role,
+    })
+    .eq('id', userId);
+  if (error) throw new Error(friendlyDbError(error.message));
+}
+
+/**
+ * Sets a crew/office member's password directly via the `admin-set-password`
+ * Supabase Edge Function (supabase/functions/admin-set-password), which
+ * holds the service role key server-side and calls the Auth Admin API — the
+ * browser can't do this directly. Admin-only; enforced both here and inside
+ * the function. No email is sent; the new password takes effect immediately.
+ */
+export async function adminSetPassword(userId: string, password: string): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('admin-set-password', {
+    body: { userId, password },
+  });
+  if (error) throw new Error(await describeFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+}
+
+/**
  * Invites a new crew member via the `invite-crew` Supabase Edge Function
  * (supabase/functions/invite-crew), which holds the service role key
  * server-side and calls the Auth Admin API — the browser can't do this

@@ -7,6 +7,7 @@ import { CallDetailOffice } from './CallDetailOffice';
 import { CreateCallModal } from './CreateCallModal';
 import { TeamView } from './TeamView';
 import { InviteCrewModal } from './InviteCrewModal';
+import { EditTeamMemberModal } from './EditTeamMemberModal';
 
 interface OfficePortalProps {
   currentUser: UserProfile;
@@ -23,6 +24,7 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
   const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -58,6 +60,11 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
   const selectedCall = useMemo(
     () => calls.find((c) => c.id === selectedCallId) || null,
     [selectedCallId, calls]
+  );
+
+  const editingMember = useMemo(
+    () => team.find((m) => m.id === editingMemberId) || null,
+    [editingMemberId, team]
   );
 
   const handleCreateSuccess = async (newCallId: string) => {
@@ -268,6 +275,7 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
                 team={team}
                 onInvite={() => setIsInviteModalOpen(true)}
                 onToggleActive={handleToggleActive}
+                onEditMember={(member) => setEditingMemberId(member.id)}
               />
             ) : (
               <ServiceCallsTable
@@ -292,6 +300,14 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
           isOpen={isInviteModalOpen}
           onClose={() => setIsInviteModalOpen(false)}
           onSuccess={loadData}
+        />
+      )}
+
+      {isAdmin && (
+        <EditTeamMemberModal
+          member={editingMember}
+          onClose={() => setEditingMemberId(null)}
+          onSaved={loadData}
         />
       )}
     </div>

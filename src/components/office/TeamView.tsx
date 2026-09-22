@@ -6,9 +6,10 @@ interface TeamViewProps {
   team: UserProfile[];
   onInvite: () => void;
   onToggleActive: (user: UserProfile) => void;
+  onEditMember: (user: UserProfile) => void;
 }
 
-export const TeamView: React.FC<TeamViewProps> = ({ team, onInvite, onToggleActive }) => {
+export const TeamView: React.FC<TeamViewProps> = ({ team, onInvite, onToggleActive, onEditMember }) => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -39,7 +40,15 @@ export const TeamView: React.FC<TeamViewProps> = ({ team, onInvite, onToggleActi
           <tbody className="divide-y divide-[#DFE2DE]">
             {team.map((member) => (
               <tr key={member.id} className="hover:bg-[#FBFBF9]">
-                <td className="py-3 px-4 font-semibold text-[#12161A]">{member.fullName}</td>
+                <td className="py-3 px-4">
+                  <button
+                    onClick={() => onEditMember(member)}
+                    className="font-semibold text-[#0F5CC4] hover:underline"
+                    title="Edit name, role, or password"
+                  >
+                    {member.fullName}
+                  </button>
+                </td>
                 <td className="py-3 px-4 text-[#3A424B]">{member.email}</td>
                 <td className="py-3 px-4 text-[#3A424B]">{member.phone || '—'}</td>
                 <td className="py-3 px-4 capitalize text-[#3A424B]">{member.role}</td>

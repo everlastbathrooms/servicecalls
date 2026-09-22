@@ -228,14 +228,14 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
           <div>
             <span className="font-bold text-sm tracking-tight block leading-tight">EVERLAST</span>
             <span className="text-[10px] text-gray-400 tracking-wider uppercase font-semibold">
-              Service Call Portal
+              Client Communications Portal
             </span>
           </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3 text-xs">
           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-3 block mb-1.5">
-            Work Orders
+            Customer Service
           </span>
           <button
             onClick={() => goToTab('service_calls')}
@@ -247,7 +247,7 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
           >
             <div className="flex items-center gap-2.5">
               <ClipboardList className="w-4 h-4" />
-              <span>Service Calls</span>
+              <span>Service Calls (Post-Install)</span>
             </div>
             {openCallsCount > 0 && (
               <span className="bg-[#0F5CC4]/20 text-blue-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
@@ -255,13 +255,9 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
               </span>
             )}
           </button>
-
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-3 block mt-6 mb-1.5">
-            Customer Service
-          </span>
           <button
             onClick={() => goToTab('communications')}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-colors ${
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium transition-colors mt-1 ${
               currentTab === 'communications' && !selectedCommunicationId
                 ? 'bg-[#0F5CC4] text-white font-bold'
                 : 'text-gray-300 hover:text-white hover:bg-white/5'
@@ -269,7 +265,7 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
           >
             <div className="flex items-center gap-2.5">
               <MessageCircle className="w-4 h-4" />
-              <span>Communications</span>
+              <span>Communications (Pre-Install)</span>
             </div>
             {openCommunicationsCount > 0 && (
               <span className="bg-[#0F5CC4]/20 text-blue-300 text-[10px] font-bold px-2 py-0.5 rounded-full">

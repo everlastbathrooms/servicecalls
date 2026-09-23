@@ -19,8 +19,12 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
   onSelect,
   onCreate,
 }) => {
+  // Default to hiding resolved/closed tickets so the log only shows what
+  // still needs follow-up, matching the Service Calls table's default.
+  const DEFAULT_STATUS_FILTER = 'active';
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(DEFAULT_STATUS_FILTER);
   const [methodFilter, setMethodFilter] = useState('all');
 
   type SortField = 'dateReceived' | 'jobNumber' | 'client' | 'method' | 'summary' | 'handledBy' | 'status';
@@ -155,11 +159,11 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
             <option value="other">Other</option>
           </select>
 
-          {(searchQuery || statusFilter !== 'all' || methodFilter !== 'all') && (
+          {(searchQuery || statusFilter !== DEFAULT_STATUS_FILTER || methodFilter !== 'all') && (
             <button
               onClick={() => {
                 setSearchQuery('');
-                setStatusFilter('all');
+                setStatusFilter(DEFAULT_STATUS_FILTER);
                 setMethodFilter('all');
               }}
               className="text-xs text-[#0F5CC4] hover:underline font-medium ml-auto"

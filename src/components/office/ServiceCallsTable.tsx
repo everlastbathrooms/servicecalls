@@ -61,6 +61,7 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
     | 'daysOpen'
     | 'installer'
     | 'installDate'
+    | 'description'
     | 'priority'
     | 'responsibility'
     | 'billing'
@@ -139,6 +140,10 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
         const timeA = a.installDate ? new Date(a.installDate).getTime() : Infinity;
         const timeB = b.installDate ? new Date(b.installDate).getTime() : Infinity;
         return sortAsc ? timeA - timeB : timeB - timeA;
+      }
+      if (sortField === 'description') {
+        const cmp = a.description.localeCompare(b.description);
+        return sortAsc ? cmp : -cmp;
       }
       if (sortField === 'responsibility') {
         const cmp = a.responsibility.localeCompare(b.responsibility);
@@ -328,6 +333,15 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
                   </div>
                 </th>
                 <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'description' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('description')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Summary</span>
+                    <SortIcon field="description" />
+                  </div>
+                </th>
+                <th
                   className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'reportedDate' ? 'text-[#12161A]' : ''}`}
                   onClick={() => toggleSort('reportedDate')}
                 >
@@ -445,6 +459,11 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
                         )}
                       </td>
 
+                      {/* Summary */}
+                      <td className="py-3 px-3 text-[#3A424B] max-w-[280px] truncate">
+                        {call.description}
+                      </td>
+
                       {/* Reported Date */}
                       <td className="py-3 px-3 text-[#3A424B] whitespace-nowrap">
                         <span>{formatDate(call.reportedDate)}</span>
@@ -525,7 +544,7 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
                 })
               ) : (
                 <tr>
-                  <td colSpan={12} className="py-12 text-center text-[#6B7A88]">
+                  <td colSpan={13} className="py-12 text-center text-[#6B7A88]">
                     <p className="text-sm font-medium">No service calls found matching filters.</p>
                     <button
                       onClick={onCreateCall}

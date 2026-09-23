@@ -22,6 +22,7 @@ import { getSecretKey } from '../_shared/keys.ts';
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? '';
 const RESEND_FROM = Deno.env.get('RESEND_FROM_EMAIL') ?? 'dispatch@everlastbathrooms.com';
+const PORTAL_URL = Deno.env.get('PORTAL_URL') ?? 'https://servicecalls.vercel.app';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SECRET_KEY = getSecretKey();
 
@@ -105,9 +106,14 @@ function buildEmail(payload: NotificationPayload) {
             ${payload.completionNote}
           </div>
         </div>` : ''}
-        <p style="margin:20px 0 0; font-size:13px; color:#6B7A88; text-align:center;">
-          Open the Everlast Bathrooms portal to view full details and photos.
-        </p>
+        <div style="margin-top:24px; text-align:center;">
+          <a href="${PORTAL_URL}" style="display:inline-block; padding:12px 28px; background:#0F5CC4; color:#fff; font-size:14px; font-weight:700; text-decoration:none; border-radius:6px;">
+            Open Portal
+          </a>
+          <p style="margin:10px 0 0; font-size:12px; color:#6B7A88;">
+            View full details and photos in the Everlast Bathrooms portal.
+          </p>
+        </div>
       </div>
     </div>
   `;

@@ -262,7 +262,7 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
                         </span>
                       </td>
                       <td className="py-3 px-3 font-mono font-bold text-[#12161A] tabular-nums whitespace-nowrap">
-                        #{c.jobNumber}
+                        {c.jobNumber ? `#${c.jobNumber}` : <span className="text-[#6B7A88] font-normal italic">—</span>}
                       </td>
                       <td className="py-3 px-3 font-semibold text-[#12161A] max-w-[160px] truncate">
                         {c.clientName || 'Customer'}

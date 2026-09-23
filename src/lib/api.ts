@@ -436,9 +436,9 @@ export async function getServiceCallById(callId: string): Promise<ServiceCall | 
 
 /**
  * Soft-deleted service calls, newest-deleted first — backs the admin-only
- * Trash view. Admin/office bypass the deleted_at filter entirely at the RLS
- * layer (see "installers read own calls" in supabase/schema.sql), so this
- * just asks for the rows the normal list explicitly excludes.
+ * Trash view. Only admins can see a soft-deleted row at all (see
+ * "installers read own calls" in supabase/schema.sql); this returns an
+ * empty list for anyone else.
  */
 export async function getDeletedServiceCalls(): Promise<ServiceCall[]> {
   const { data, error } = await supabase
@@ -547,27 +547,22 @@ export async function updateServiceCall(
 }
 
 /**
- * Soft-deletes a service call: stamps deleted_at/deleted_by instead of
- * removing the row, so it disappears from normal views but stays fully
- * recoverable from the Trash view. Covered by the office/admin UPDATE
- * policy on service_calls; the admin-only restriction is enforced by the
- * UI (only admins see the delete button).
+ * Soft-deletes a service call via the soft_delete_service_call RPC
+ * (supabase/schema.sql), which stamps deleted_at/deleted_by from the
+ * server side and checks auth_role() = 'admin' itself — restricted to
+ * admins at the database level, not just by hiding the button in the UI.
  */
 export async function deleteServiceCall(callId: string): Promise<void> {
-  const profile = await getCurrentProfile();
-  const { error } = await supabase
-    .from('service_calls')
-    .update({ deleted_at: new Date().toISOString(), deleted_by: profile?.id || null })
-    .eq('id', callId);
+  const { error } = await supabase.rpc('soft_delete_service_call', { p_call_id: callId });
   if (error) throw new Error(friendlyDbError(error.message));
 }
 
-/** Undoes a soft delete, putting the call back in every normal view. */
+/**
+ * Undoes a soft delete via the restore_service_call RPC, putting the call
+ * back in every normal view. Admin-only, enforced the same way as delete.
+ */
 export async function restoreServiceCall(callId: string): Promise<void> {
-  const { error } = await supabase
-    .from('service_calls')
-    .update({ deleted_at: null, deleted_by: null })
-    .eq('id', callId);
+  const { error } = await supabase.rpc('restore_service_call', { p_call_id: callId });
   if (error) throw new Error(friendlyDbError(error.message));
 }
 
@@ -794,13 +789,14 @@ function mapCommunication(row: any): CustomerCommunication {
   const notes = row.notes ? row.notes.map(mapCommunicationNote) : [];
   return {
     id: row.id,
+    clientId: row.client_id,
     serviceCallId: row.service_call_id,
     // Prefer the live job/client (job number can change, a new handler can
-    // pick up the client) but fall back to the snapshot taken at creation
-    // time once the job itself has been deleted (service_call_id is null).
+    // pick up the client) but fall back to the direct client link, then the
+    // snapshot taken at creation time once both have been deleted.
     jobNumber: row.service_call?.job_number ?? row.job_number_snapshot,
-    clientName: row.service_call?.client?.name ?? row.client_name_snapshot,
-    clientPhone: row.service_call?.client?.phone ?? row.client_phone_snapshot,
+    clientName: row.service_call?.client?.name ?? row.client?.name ?? row.client_name_snapshot,
+    clientPhone: row.service_call?.client?.phone ?? row.client?.phone ?? row.client_phone_snapshot,
     dateReceived: row.date_received,
     method: row.method,
     status: row.status,
@@ -821,6 +817,7 @@ function mapCommunication(row: any): CustomerCommunication {
 
 const COMMUNICATION_SELECT = `
   *,
+  client:clients(name, phone),
   service_call:service_calls(job_number, client:clients(name, phone)),
   handled_by_profile:profiles!customer_communications_handled_by_fkey(full_name),
   deleted_by_profile:profiles!customer_communications_deleted_by_fkey(full_name),
@@ -879,7 +876,8 @@ export async function getDeletedCommunications(): Promise<CustomerCommunication[
 }
 
 export async function createCommunication(input: {
-  serviceCallId: string;
+  clientId: string;
+  serviceCallId?: string | null;
   dateReceived: string;
   method: CommunicationMethod;
   handledBy: string;
@@ -891,7 +889,8 @@ export async function createCommunication(input: {
   const { data, error } = await supabase
     .from('customer_communications')
     .insert({
-      service_call_id: input.serviceCallId,
+      client_id: input.clientId,
+      service_call_id: input.serviceCallId || null,
       date_received: input.dateReceived,
       method: input.method,
       status: 'open',
@@ -932,27 +931,23 @@ export async function updateCommunication(
 }
 
 /**
- * Soft-deletes a communication ticket: stamps deleted_at/deleted_by instead
- * of removing the row, so it disappears from normal views but stays fully
- * recoverable from the Trash view. Covered by the office/admin UPDATE
- * policy on customer_communications; the admin-only restriction is
- * enforced by the UI (only admins see the delete button).
+ * Soft-deletes a communication ticket via the soft_delete_communication RPC
+ * (supabase/schema.sql), which stamps deleted_at/deleted_by from the
+ * server side and checks auth_role() = 'admin' itself — restricted to
+ * admins at the database level, not just by hiding the button in the UI.
  */
 export async function deleteCommunication(id: string): Promise<void> {
-  const profile = await getCurrentProfile();
-  const { error } = await supabase
-    .from('customer_communications')
-    .update({ deleted_at: new Date().toISOString(), deleted_by: profile?.id || null })
-    .eq('id', id);
+  const { error } = await supabase.rpc('soft_delete_communication', { p_id: id });
   if (error) throw new Error(friendlyDbError(error.message));
 }
 
-/** Undoes a soft delete, putting the ticket back in every normal view. */
+/**
+ * Undoes a soft delete via the restore_communication RPC, putting the
+ * ticket back in every normal view. Admin-only, enforced the same way as
+ * delete.
+ */
 export async function restoreCommunication(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('customer_communications')
-    .update({ deleted_at: null, deleted_by: null })
-    .eq('id', id);
+  const { error } = await supabase.rpc('restore_communication', { p_id: id });
   if (error) throw new Error(friendlyDbError(error.message));
 }
 

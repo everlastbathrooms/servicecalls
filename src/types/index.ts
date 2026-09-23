@@ -107,10 +107,11 @@ export interface CommunicationNote {
 
 export interface CustomerCommunication {
   id: string;
-  serviceCallId: string | null;
-  jobNumber?: string; // from the linked service call, for display
-  clientName?: string; // from the linked service call's client, for display
-  clientPhone?: string | null; // from the linked service call's client, for display
+  clientId: string | null;
+  serviceCallId: string | null; // only set when logged from a specific job's page
+  jobNumber?: string; // from the linked service call, if any, for display
+  clientName?: string; // from the client, for display
+  clientPhone?: string | null; // from the client, for display
   dateReceived: string; // YYYY-MM-DD
   method: CommunicationMethod;
   status: CommunicationStatus;

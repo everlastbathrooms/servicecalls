@@ -226,15 +226,15 @@ DROP POLICY IF EXISTS "office and admin insert clients" ON clients;
 CREATE POLICY "office and admin insert clients" ON clients FOR INSERT
 WITH CHECK (auth_role() IN ('admin', 'office'));
 
--- service_calls: installers see only their own rows (and never a
--- soft-deleted one); admin/office see all, including deleted, so the Trash
--- view can find them — the app filters deleted_at IS NULL for their normal
--- list views.
+-- service_calls: only admins can see a soft-deleted row at all (that's what
+-- makes Trash admin-only) — office and installers both get deleted_at IS
+-- NULL baked into their branch, not just filtered client-side.
 DROP POLICY IF EXISTS "installers read own calls" ON service_calls;
 CREATE POLICY "installers read own calls"
 ON service_calls FOR SELECT
 USING (
-  auth_role() IN ('admin', 'office')
+  auth_role() = 'admin'
+  OR (auth_role() = 'office' AND deleted_at IS NULL)
   OR (installer_id = auth.uid() AND deleted_at IS NULL)
 );
 
@@ -340,6 +340,34 @@ BEGIN
   END IF;
 END $$;
 
+-- 9b. RPC: soft_delete_service_call / restore_service_call — admin-only,
+-- enforced inside the function rather than relying on the broad
+-- office+admin UPDATE policy, so office can never soft-delete or restore a
+-- call even by calling the write directly.
+CREATE OR REPLACE FUNCTION public.soft_delete_service_call(p_call_id UUID) RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth_role() <> 'admin' THEN
+    RAISE EXCEPTION 'Only admins can delete a service call';
+  END IF;
+
+  UPDATE service_calls SET deleted_at = now(), deleted_by = auth.uid() WHERE id = p_call_id;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.restore_service_call(p_call_id UUID) RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth_role() <> 'admin' THEN
+    RAISE EXCEPTION 'Only admins can restore a service call';
+  END IF;
+
+  UPDATE service_calls SET deleted_at = NULL, deleted_by = NULL WHERE id = p_call_id;
+END $$;
+
 -- 10. Storage bucket for photos/videos (private; access via signed URLs only)
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('service-call-media', 'service-call-media', false)
@@ -369,7 +397,11 @@ WITH CHECK (
 
 
 -- =====================================================================
--- Customer Service Log (office/admin only, always tied to a job — see
+-- Customer Service Log (office/admin only). Independent of service_calls:
+-- a ticket is logged against a client directly (client_id) and optionally
+-- also against a specific job (service_call_id) when started from that
+-- job's page — but logging a ticket never creates a job, and deleting a
+-- job never takes its tickets with it. See
 -- migrations/20260922000000_customer_communications_log.sql for the
 -- standalone diff applied to an already-running project via
 -- `supabase db push`)
@@ -385,13 +417,15 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 2. customer_communications — one row per logged customer service ticket.
--- Logged against a job at creation time, but NOT cascade-deleted with it
--- (ON DELETE SET NULL) — a ticket is independent history once it exists, so
--- deleting the work order later must never silently wipe it. job/client
--- context is snapshotted at insert time (see the trigger below) so the
--- ticket still reads correctly even after its job is gone.
+-- Logged against a client directly (client_id); service_call_id is only
+-- set when the ticket was started from a specific job's page — logging a
+-- ticket never creates a job. Neither FK cascades a delete onto the ticket
+-- (ON DELETE SET NULL) — a ticket is independent history once it exists.
+-- client/job context is snapshotted at insert time (see the trigger below)
+-- so the ticket still reads correctly even after the client or job is gone.
 CREATE TABLE IF NOT EXISTS customer_communications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
   service_call_id UUID REFERENCES service_calls(id) ON DELETE SET NULL,
   job_number_snapshot TEXT,
   client_name_snapshot TEXT,
@@ -410,6 +444,7 @@ CREATE TABLE IF NOT EXISTS customer_communications (
   deleted_by UUID NULL REFERENCES profiles(id) ON DELETE SET NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_comms_client ON customer_communications (client_id);
 CREATE INDEX IF NOT EXISTS idx_comms_service_call ON customer_communications (service_call_id);
 CREATE INDEX IF NOT EXISTS idx_comms_date_received ON customer_communications (date_received DESC);
 CREATE INDEX IF NOT EXISTS idx_comms_status_open ON customer_communications (status) WHERE status <> 'closed';
@@ -434,9 +469,14 @@ CREATE INDEX IF NOT EXISTS idx_comm_notes_comm_time ON communication_notes (comm
 ALTER TABLE customer_communications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE communication_notes ENABLE ROW LEVEL SECURITY;
 
+-- Only admins can see a soft-deleted ticket at all (that's what makes
+-- Trash admin-only) — office gets deleted_at IS NULL baked into its branch.
 DROP POLICY IF EXISTS "office and admin read communications" ON customer_communications;
 CREATE POLICY "office and admin read communications" ON customer_communications FOR SELECT
-USING (auth_role() IN ('admin', 'office'));
+USING (
+  auth_role() = 'admin'
+  OR (auth_role() = 'office' AND deleted_at IS NULL)
+);
 
 DROP POLICY IF EXISTS "office and admin insert communications" ON customer_communications;
 CREATE POLICY "office and admin insert communications" ON customer_communications FOR INSERT
@@ -481,20 +521,26 @@ CREATE TRIGGER set_customer_communications_updated_at
   BEFORE UPDATE ON customer_communications
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
--- 6. Snapshot job/client context onto each ticket at insert time, so it
--- keeps reading correctly after its service_call_id is nulled out by a
--- later job deletion (ON DELETE SET NULL above).
+-- 6. Snapshot client/job context onto each ticket at insert time, so it
+-- keeps reading correctly after client_id/service_call_id are nulled out
+-- by a later delete (ON DELETE SET NULL above). When a job is given, also
+-- backfill client_id from it, so client_id is always populated when known.
 CREATE OR REPLACE FUNCTION public.snapshot_communication_job_info() RETURNS TRIGGER
 LANGUAGE plpgsql
 SET search_path = public
 AS $$
 BEGIN
   IF NEW.service_call_id IS NOT NULL THEN
-    SELECT sc.job_number, c.name, c.phone
-    INTO NEW.job_number_snapshot, NEW.client_name_snapshot, NEW.client_phone_snapshot
+    SELECT sc.job_number, sc.client_id, c.name, c.phone
+    INTO NEW.job_number_snapshot, NEW.client_id, NEW.client_name_snapshot, NEW.client_phone_snapshot
     FROM service_calls sc
     JOIN clients c ON c.id = sc.client_id
     WHERE sc.id = NEW.service_call_id;
+  ELSIF NEW.client_id IS NOT NULL THEN
+    SELECT c.name, c.phone
+    INTO NEW.client_name_snapshot, NEW.client_phone_snapshot
+    FROM clients c
+    WHERE c.id = NEW.client_id;
   END IF;
   RETURN NEW;
 END $$;
@@ -503,3 +549,31 @@ DROP TRIGGER IF EXISTS snapshot_communication_job_info_trigger ON customer_commu
 CREATE TRIGGER snapshot_communication_job_info_trigger
   BEFORE INSERT ON customer_communications
   FOR EACH ROW EXECUTE FUNCTION public.snapshot_communication_job_info();
+
+-- 7. RPC: soft_delete_communication / restore_communication — admin-only,
+-- enforced inside the function rather than relying on the broad
+-- office+admin UPDATE policy, so office can never soft-delete or restore a
+-- ticket even by calling the write directly.
+CREATE OR REPLACE FUNCTION public.soft_delete_communication(p_id UUID) RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth_role() <> 'admin' THEN
+    RAISE EXCEPTION 'Only admins can delete a communication ticket';
+  END IF;
+
+  UPDATE customer_communications SET deleted_at = now(), deleted_by = auth.uid() WHERE id = p_id;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.restore_communication(p_id UUID) RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth_role() <> 'admin' THEN
+    RAISE EXCEPTION 'Only admins can restore a communication ticket';
+  END IF;
+
+  UPDATE customer_communications SET deleted_at = NULL, deleted_by = NULL WHERE id = p_id;
+END $$;

@@ -46,7 +46,8 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
   };
 
   const handleDelete = () => {
-    if (window.confirm(`Delete this ticket for #${communication.jobNumber}? This cannot be undone.`)) {
+    const label = communication.jobNumber ? `#${communication.jobNumber}` : communication.clientName || 'this ticket';
+    if (window.confirm(`Delete ${label}? This cannot be undone.`)) {
       onDeleteCommunication(communication.id);
     }
   };
@@ -68,7 +69,7 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
               </span>
             </div>
             <h1 className="text-xl font-bold text-[#12161A] mt-1 flex items-center gap-2">
-              <span className="font-mono">#{communication.jobNumber}</span>
+              {communication.jobNumber && <span className="font-mono">#{communication.jobNumber}</span>}
               <span className="text-[#6B7A88] font-normal text-base">{communication.clientName || 'Customer'}</span>
             </h1>
           </div>
@@ -208,15 +209,17 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
           </div>
 
           <div className="bg-white p-5 rounded-xl border border-[#DFE2DE] shadow-xs space-y-3 text-xs">
-            <h2 className="font-bold uppercase tracking-wider text-[#3A424B]">Job Info</h2>
-            <div>
-              <span className="text-[#6B7A88] block text-[11px]">Job Number:</span>
-              <span className="font-mono font-bold text-[#12161A] text-sm">#{communication.jobNumber}</span>
-            </div>
+            <h2 className="font-bold uppercase tracking-wider text-[#3A424B]">Client &amp; Job Info</h2>
             <div>
               <span className="text-[#6B7A88] block text-[11px]">Client:</span>
               <span className="font-semibold text-[#12161A] text-sm">{communication.clientName || 'Customer'}</span>
             </div>
+            {communication.jobNumber && (
+              <div>
+                <span className="text-[#6B7A88] block text-[11px]">Job Number:</span>
+                <span className="font-mono font-bold text-[#12161A] text-sm">#{communication.jobNumber}</span>
+              </div>
+            )}
             {onViewJob && communication.serviceCallId ? (
               <button
                 type="button"
@@ -226,9 +229,13 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
                 <ExternalLink className="w-3.5 h-3.5" />
                 <span>Open Work Order</span>
               </button>
-            ) : (
+            ) : communication.jobNumber ? (
               <p className="text-[11px] text-[#6B7A88] italic">
                 The original work order has been deleted.
+              </p>
+            ) : (
+              <p className="text-[11px] text-[#6B7A88] italic">
+                Not linked to a work order.
               </p>
             )}
             <div className="pt-2 border-t border-[#DFE2DE] text-[11px] text-[#6B7A88] space-y-1">

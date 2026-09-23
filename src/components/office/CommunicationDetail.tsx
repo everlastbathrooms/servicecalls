@@ -217,15 +217,19 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
               <span className="text-[#6B7A88] block text-[11px]">Client:</span>
               <span className="font-semibold text-[#12161A] text-sm">{communication.clientName || 'Customer'}</span>
             </div>
-            {onViewJob && (
+            {onViewJob && communication.serviceCallId ? (
               <button
                 type="button"
-                onClick={() => onViewJob(communication.serviceCallId)}
+                onClick={() => onViewJob(communication.serviceCallId!)}
                 className="text-xs text-[#0F5CC4] font-semibold hover:underline flex items-center gap-1"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
                 <span>Open Work Order</span>
               </button>
+            ) : (
+              <p className="text-[11px] text-[#6B7A88] italic">
+                The original work order has been deleted.
+              </p>
             )}
             <div className="pt-2 border-t border-[#DFE2DE] text-[11px] text-[#6B7A88] space-y-1">
               <div>Received: {formatDate(communication.dateReceived)}</div>

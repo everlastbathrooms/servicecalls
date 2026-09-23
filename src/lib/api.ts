@@ -748,9 +748,12 @@ function mapCommunication(row: any): CustomerCommunication {
   return {
     id: row.id,
     serviceCallId: row.service_call_id,
-    jobNumber: row.service_call?.job_number,
-    clientName: row.service_call?.client?.name,
-    clientPhone: row.service_call?.client?.phone,
+    // Prefer the live job/client (job number can change, a new handler can
+    // pick up the client) but fall back to the snapshot taken at creation
+    // time once the job itself has been deleted (service_call_id is null).
+    jobNumber: row.service_call?.job_number ?? row.job_number_snapshot,
+    clientName: row.service_call?.client?.name ?? row.client_name_snapshot,
+    clientPhone: row.service_call?.client?.phone ?? row.client_phone_snapshot,
     dateReceived: row.date_received,
     method: row.method,
     status: row.status,

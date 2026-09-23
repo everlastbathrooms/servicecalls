@@ -374,11 +374,17 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 2. customer_communications — one row per logged customer service ticket.
--- Always tied to a job; the client's name/phone/address come from the
--- linked service_calls -> clients chain, so they are not duplicated here.
+-- Logged against a job at creation time, but NOT cascade-deleted with it
+-- (ON DELETE SET NULL) — a ticket is independent history once it exists, so
+-- deleting the work order later must never silently wipe it. job/client
+-- context is snapshotted at insert time (see the trigger below) so the
+-- ticket still reads correctly even after its job is gone.
 CREATE TABLE IF NOT EXISTS customer_communications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  service_call_id UUID NOT NULL REFERENCES service_calls(id) ON DELETE CASCADE,
+  service_call_id UUID REFERENCES service_calls(id) ON DELETE SET NULL,
+  job_number_snapshot TEXT,
+  client_name_snapshot TEXT,
+  client_phone_snapshot TEXT,
   date_received DATE NOT NULL DEFAULT CURRENT_DATE,
   method communication_method NOT NULL,
   status communication_status NOT NULL DEFAULT 'open',
@@ -455,3 +461,26 @@ DROP TRIGGER IF EXISTS set_customer_communications_updated_at ON customer_commun
 CREATE TRIGGER set_customer_communications_updated_at
   BEFORE UPDATE ON customer_communications
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- 6. Snapshot job/client context onto each ticket at insert time, so it
+-- keeps reading correctly after its service_call_id is nulled out by a
+-- later job deletion (ON DELETE SET NULL above).
+CREATE OR REPLACE FUNCTION public.snapshot_communication_job_info() RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.service_call_id IS NOT NULL THEN
+    SELECT sc.job_number, c.name, c.phone
+    INTO NEW.job_number_snapshot, NEW.client_name_snapshot, NEW.client_phone_snapshot
+    FROM service_calls sc
+    JOIN clients c ON c.id = sc.client_id
+    WHERE sc.id = NEW.service_call_id;
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS snapshot_communication_job_info_trigger ON customer_communications;
+CREATE TRIGGER snapshot_communication_job_info_trigger
+  BEFORE INSERT ON customer_communications
+  FOR EACH ROW EXECUTE FUNCTION public.snapshot_communication_job_info();

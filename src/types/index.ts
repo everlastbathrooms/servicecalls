@@ -105,7 +105,7 @@ export interface CommunicationNote {
 
 export interface CustomerCommunication {
   id: string;
-  serviceCallId: string;
+  serviceCallId: string | null;
   jobNumber?: string; // from the linked service call, for display
   clientName?: string; // from the linked service call's client, for display
   clientPhone?: string | null; // from the linked service call's client, for display

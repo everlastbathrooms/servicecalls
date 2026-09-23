@@ -712,6 +712,7 @@ function mapCommunication(row: any): CustomerCommunication {
     serviceCallId: row.service_call_id,
     jobNumber: row.service_call?.job_number,
     clientName: row.service_call?.client?.name,
+    clientPhone: row.service_call?.client?.phone,
     dateReceived: row.date_received,
     method: row.method,
     status: row.status,
@@ -730,7 +731,7 @@ function mapCommunication(row: any): CustomerCommunication {
 
 const COMMUNICATION_SELECT = `
   *,
-  service_call:service_calls(job_number, client:clients(name)),
+  service_call:service_calls(job_number, client:clients(name, phone)),
   handled_by_profile:profiles!customer_communications_handled_by_fkey(full_name),
   notes:communication_notes(*, author:profiles!communication_notes_author_id_fkey(full_name))
 `;

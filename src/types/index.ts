@@ -108,6 +108,7 @@ export interface CustomerCommunication {
   serviceCallId: string;
   jobNumber?: string; // from the linked service call, for display
   clientName?: string; // from the linked service call's client, for display
+  clientPhone?: string | null; // from the linked service call's client, for display
   dateReceived: string; // YYYY-MM-DD
   method: CommunicationMethod;
   status: CommunicationStatus;

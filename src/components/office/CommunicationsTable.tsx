@@ -23,7 +23,7 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
   const [statusFilter, setStatusFilter] = useState('all');
   const [methodFilter, setMethodFilter] = useState('all');
 
-  type SortField = 'dateReceived' | 'jobNumber' | 'method' | 'summary' | 'handledBy' | 'status';
+  type SortField = 'dateReceived' | 'jobNumber' | 'client' | 'method' | 'summary' | 'handledBy' | 'status';
   const [sortField, setSortField] = useState<SortField>('dateReceived');
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -73,6 +73,10 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
         }
         if (sortField === 'jobNumber') {
           const cmp = (a.jobNumber || '').localeCompare(b.jobNumber || '');
+          return sortAsc ? cmp : -cmp;
+        }
+        if (sortField === 'client') {
+          const cmp = (a.clientName || '').localeCompare(b.clientName || '');
           return sortAsc ? cmp : -cmp;
         }
         if (sortField === 'method') {
@@ -185,8 +189,17 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
                   onClick={() => toggleSort('jobNumber')}
                 >
                   <div className="flex items-center gap-1">
-                    <span>Job / Client</span>
+                    <span>Job #</span>
                     <SortIcon field="jobNumber" />
+                  </div>
+                </th>
+                <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'client' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('client')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Client</span>
+                    <SortIcon field="client" />
                   </div>
                 </th>
                 <th
@@ -244,9 +257,14 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
                           {formatRelativeDate(c.dateReceived)}
                         </span>
                       </td>
-                      <td className="py-3 px-3 max-w-[200px] truncate">
-                        <span className="font-mono font-bold text-[#12161A] tabular-nums">#{c.jobNumber}</span>
-                        <span className="block text-[10px] text-[#6B7A88] truncate">{c.clientName || 'Customer'}</span>
+                      <td className="py-3 px-3 font-mono font-bold text-[#12161A] tabular-nums whitespace-nowrap">
+                        #{c.jobNumber}
+                      </td>
+                      <td className="py-3 px-3 font-semibold text-[#12161A] max-w-[160px] truncate">
+                        {c.clientName || 'Customer'}
+                        {c.clientPhone && (
+                          <span className="block text-[11px] font-normal text-[#6B7A88]">{c.clientPhone}</span>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-[#3A424B] whitespace-nowrap">
                         {getCommunicationMethodLabel(c.method)}
@@ -268,7 +286,7 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-[#6B7A88]">
+                  <td colSpan={8} className="py-12 text-center text-[#6B7A88]">
                     <p className="text-sm font-medium">No customer service tickets logged matching filters.</p>
                     <button
                       onClick={onCreate}

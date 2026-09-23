@@ -20,8 +20,20 @@ interface OfficePortalProps {
 
 type OfficeNavigationTab = 'service_calls' | 'communications' | 'team';
 
+// Keep the current tab in the URL hash (not a real route, so it needs no
+// server-side rewrite config) purely so a browser refresh lands back on the
+// section the user was viewing instead of always resetting to Service Calls.
+function readTabFromHash(isAdmin: boolean): OfficeNavigationTab {
+  const hash = window.location.hash.replace('#', '');
+  if (hash === 'team' && isAdmin) return 'team';
+  if (hash === 'communications') return 'communications';
+  return 'service_calls';
+}
+
 export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogout }) => {
-  const [currentTab, setCurrentTab] = useState<OfficeNavigationTab>('service_calls');
+  const [currentTab, setCurrentTab] = useState<OfficeNavigationTab>(() =>
+    readTabFromHash(currentUser.role === 'admin')
+  );
   const [calls, setCalls] = useState<ServiceCall[]>([]);
   const [installers, setInstallers] = useState<UserProfile[]>([]);
   const [team, setTeam] = useState<UserProfile[]>([]);
@@ -235,6 +247,7 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
     setCurrentTab(tab);
     setSelectedCallId(null);
     setSelectedCommunicationId(null);
+    window.history.replaceState(null, '', `#${tab}`);
   };
 
   return (

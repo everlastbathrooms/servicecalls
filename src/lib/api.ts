@@ -307,6 +307,44 @@ export async function adminSetPassword(userId: string, password: string): Promis
 }
 
 /**
+ * Team members who have never signed in (their auth account has no
+ * last_sign_in_at yet — typically because an invite email never got
+ * delivered or was never completed). Backed by the `admin-set-password`
+ * Edge Function's `list_unactivated` action, since only the service role
+ * can see auth.users state.
+ */
+export async function listUnactivatedTeamMembers(): Promise<
+  { id: string; fullName: string; email: string; role: UserRole }[]
+> {
+  const { data, error } = await supabase.functions.invoke('admin-set-password', {
+    body: { action: 'list_unactivated' },
+  });
+  if (error) throw new Error(await describeFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return (data?.users || []).map((u: any) => ({
+    id: u.id,
+    fullName: u.full_name,
+    email: u.email,
+    role: u.role,
+  }));
+}
+
+/**
+ * Sets the same password for a batch of never-signed-in team members in one
+ * call (the "activate everyone who hasn't set a password yet" flow). The
+ * Edge Function recomputes who's still never-signed-in server-side, so this
+ * can never overwrite a password for someone who's already active.
+ */
+export async function bulkActivateTeamMembers(userIds: string[], password: string): Promise<number> {
+  const { data, error } = await supabase.functions.invoke('admin-set-password', {
+    body: { action: 'bulk_set_password', userIds, password },
+  });
+  if (error) throw new Error(await describeFunctionError(error));
+  if (data?.error) throw new Error(data.error);
+  return data?.updatedCount || 0;
+}
+
+/**
  * Invites a new crew member via the `invite-crew` Supabase Edge Function
  * (supabase/functions/invite-crew), which holds the service role key
  * server-side and calls the Auth Admin API — the browser can't do this

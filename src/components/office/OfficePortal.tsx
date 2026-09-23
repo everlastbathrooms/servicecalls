@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ClipboardList, Plus, LogOut, CheckCircle2, RefreshCw, Users, MessageCircle } from 'lucide-react';
-import { CommunicationMethod, CommunicationStatus, CustomerCommunication, ServiceCall, UserProfile } from '../../types';
+import { CommunicationMethod, CommunicationStatus, CustomerCommunication, ServiceCall, UserProfile, UserRole } from '../../types';
 import * as api from '../../lib/api';
 import { ServiceCallsTable } from './ServiceCallsTable';
 import { CallDetailOffice } from './CallDetailOffice';
@@ -11,6 +11,7 @@ import { EditTeamMemberModal } from './EditTeamMemberModal';
 import { CommunicationsTable } from './CommunicationsTable';
 import { CommunicationDetail } from './CommunicationDetail';
 import { CreateCommunicationModal } from './CreateCommunicationModal';
+import { BulkActivateModal } from './BulkActivateModal';
 
 interface OfficePortalProps {
   currentUser: UserProfile;
@@ -34,6 +35,10 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
   const [presetCommServiceCallId, setPresetCommServiceCallId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [unactivatedMembers, setUnactivatedMembers] = useState<
+    { id: string; fullName: string; email: string; role: UserRole }[]
+  >([]);
+  const [isBulkActivateOpen, setIsBulkActivateOpen] = useState(false);
 
   const isAdmin = currentUser.role === 'admin';
 
@@ -65,6 +70,22 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const refreshUnactivatedMembers = useCallback(async () => {
+    if (!isAdmin) return;
+    try {
+      const members = await api.listUnactivatedTeamMembers();
+      setUnactivatedMembers(members);
+    } catch {
+      // Non-critical: the banner just won't show if this fails.
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (currentTab === 'team' && isAdmin) {
+      refreshUnactivatedMembers();
+    }
+  }, [currentTab, isAdmin, refreshUnactivatedMembers]);
 
   const selectedCall = useMemo(
     () => calls.find((c) => c.id === selectedCallId) || null,
@@ -197,6 +218,14 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
     } catch (e: any) {
       alert(`Error: ${e.message}`);
     }
+  };
+
+  const handleBulkActivate = async (password: string) => {
+    const ids = unactivatedMembers.map((m) => m.id);
+    const count = await api.bulkActivateTeamMembers(ids, password);
+    showToast(`${count} account${count === 1 ? '' : 's'} activated`);
+    setIsBulkActivateOpen(false);
+    await refreshUnactivatedMembers();
   };
 
   const openCallsCount = calls.filter((c) => c.status === 'open' || c.status === 'in_progress').length;
@@ -385,12 +414,29 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
                 onDeleteCommunication={handleDeleteCommunication}
               />
             ) : currentTab === 'team' && isAdmin ? (
-              <TeamView
-                team={team}
-                onInvite={() => setIsInviteModalOpen(true)}
-                onToggleActive={handleToggleActive}
-                onEditMember={(member) => setEditingMemberId(member.id)}
-              />
+              <div className="space-y-4">
+                {unactivatedMembers.length > 0 && (
+                  <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3 text-xs">
+                    <span>
+                      <strong>{unactivatedMembers.length}</strong> team member
+                      {unactivatedMembers.length === 1 ? ' has' : 's have'} never signed in — their invite may not
+                      have gone through: {unactivatedMembers.map((m) => m.fullName).join(', ')}.
+                    </span>
+                    <button
+                      onClick={() => setIsBulkActivateOpen(true)}
+                      className="shrink-0 px-3 py-1.5 bg-amber-900 hover:bg-amber-950 text-white text-xs font-bold rounded-lg transition-colors"
+                    >
+                      Activate All
+                    </button>
+                  </div>
+                )}
+                <TeamView
+                  team={team}
+                  onInvite={() => setIsInviteModalOpen(true)}
+                  onToggleActive={handleToggleActive}
+                  onEditMember={(member) => setEditingMemberId(member.id)}
+                />
+              </div>
             ) : currentTab === 'communications' ? (
               <CommunicationsTable
                 communications={communications}
@@ -440,6 +486,15 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
           member={editingMember}
           onClose={() => setEditingMemberId(null)}
           onSaved={loadData}
+        />
+      )}
+
+      {isAdmin && (
+        <BulkActivateModal
+          isOpen={isBulkActivateOpen}
+          members={unactivatedMembers}
+          onClose={() => setIsBulkActivateOpen(false)}
+          onActivate={handleBulkActivate}
         />
       )}
     </div>

@@ -452,7 +452,9 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
             {selectedCall
               ? `Work Order #${selectedCall.jobNumber}`
               : selectedCommunication
-              ? `Job #${selectedCommunication.jobNumber} — Customer Service Ticket`
+              ? selectedCommunication.jobNumber
+                ? `Job #${selectedCommunication.jobNumber} — Customer Service Ticket`
+                : `${selectedCommunication.clientName || 'Customer'} — Customer Service Ticket`
               : currentTab === 'team'
               ? 'Crew & Office Accounts'
               : currentTab === 'trash'

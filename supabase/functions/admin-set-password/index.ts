@@ -181,7 +181,10 @@ Deno.serve(async (req: Request) => {
 
     const results = await Promise.all(
       targetIds.map(async (id) => {
-        const { error } = await adminClient.auth.admin.updateUserById(id, { password: payload.password });
+        const { error } = await adminClient.auth.admin.updateUserById(id, {
+          password: payload.password,
+          email_confirm: true,
+        });
         return { id, ok: !error, error: error?.message };
       })
     );
@@ -203,6 +206,7 @@ Deno.serve(async (req: Request) => {
 
   const { error: updateError } = await adminClient.auth.admin.updateUserById(payload.userId, {
     password: payload.password,
+    email_confirm: true,
   });
 
   if (updateError) {

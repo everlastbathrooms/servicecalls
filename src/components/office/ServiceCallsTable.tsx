@@ -435,7 +435,7 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
                     <tr
                       key={call.id}
                       onClick={() => onSelectCall(call)}
-                      className="hover:bg-[#FBFBF9] cursor-pointer transition-colors group"
+                      className="hover:bg-[#FBFBF9] cursor-pointer transition-colors group align-top"
                     >
                       {/* Left Edge Priority Indicator Bar (Per Spec Section 7.3 & 8) */}
                       <td
@@ -460,8 +460,8 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
                       </td>
 
                       {/* Summary */}
-                      <td className="py-3 px-3 text-[#3A424B] max-w-[280px] truncate">
-                        {call.description}
+                      <td className="py-3 px-3 text-[#3A424B] max-w-[280px] min-w-[200px] align-top">
+                        <p className="line-clamp-3">{call.description}</p>
                       </td>
 
                       {/* Reported Date */}

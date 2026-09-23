@@ -75,6 +75,8 @@ export interface ServiceCall {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
+  deletedByName?: string | null;
   attachments?: Attachment[];
   notes?: ServiceCallNote[];
 }
@@ -118,5 +120,7 @@ export interface CustomerCommunication {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
+  deletedByName?: string | null;
   notes?: CommunicationNote[];
 }

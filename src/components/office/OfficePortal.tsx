@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ClipboardList, Plus, LogOut, CheckCircle2, RefreshCw, Users, MessageCircle } from 'lucide-react';
+import { ClipboardList, Plus, LogOut, CheckCircle2, RefreshCw, Users, MessageCircle, Trash2 } from 'lucide-react';
 import { CommunicationMethod, CommunicationStatus, CustomerCommunication, ServiceCall, UserProfile, UserRole } from '../../types';
 import * as api from '../../lib/api';
 import { ServiceCallsTable } from './ServiceCallsTable';
@@ -12,20 +12,21 @@ import { CommunicationsTable } from './CommunicationsTable';
 import { CommunicationDetail } from './CommunicationDetail';
 import { CreateCommunicationModal } from './CreateCommunicationModal';
 import { BulkActivateModal } from './BulkActivateModal';
+import { TrashView } from './TrashView';
 
 interface OfficePortalProps {
   currentUser: UserProfile;
   onLogout: () => void;
 }
 
-type OfficeNavigationTab = 'service_calls' | 'communications' | 'team';
+type OfficeNavigationTab = 'service_calls' | 'communications' | 'team' | 'trash';
 
 // Keep the current tab in the URL hash (not a real route, so it needs no
 // server-side rewrite config) purely so a browser refresh lands back on the
 // section the user was viewing instead of always resetting to Service Calls.
 function readTabFromHash(isAdmin: boolean): OfficeNavigationTab {
   const hash = window.location.hash.replace('#', '');
-  if (hash === 'team' && isAdmin) return 'team';
+  if ((hash === 'team' || hash === 'trash') && isAdmin) return hash;
   if (hash === 'communications') return 'communications';
   return 'service_calls';
 }
@@ -51,6 +52,8 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
     { id: string; fullName: string; email: string; role: UserRole }[]
   >([]);
   const [isBulkActivateOpen, setIsBulkActivateOpen] = useState(false);
+  const [deletedCalls, setDeletedCalls] = useState<ServiceCall[]>([]);
+  const [deletedCommunications, setDeletedCommunications] = useState<CustomerCommunication[]>([]);
 
   const isAdmin = currentUser.role === 'admin';
 
@@ -98,6 +101,32 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
       refreshUnactivatedMembers();
     }
   }, [currentTab, isAdmin, refreshUnactivatedMembers]);
+
+  const refreshTrash = useCallback(async () => {
+    if (!isAdmin) return;
+    try {
+      const [deletedCallsData, deletedCommsData] = await Promise.all([
+        api.getDeletedServiceCalls(),
+        api.getDeletedCommunications(),
+      ]);
+      setDeletedCalls(deletedCallsData);
+      setDeletedCommunications(deletedCommsData);
+    } catch (err: any) {
+      showToast(`Error loading trash: ${err.message}`);
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (currentTab === 'trash' && isAdmin) {
+      refreshTrash();
+    }
+  }, [currentTab, isAdmin, refreshTrash]);
+
+  // Also fetch once on load (not just when the Trash tab is opened) so the
+  // sidebar badge count is accurate right away.
+  useEffect(() => {
+    refreshTrash();
+  }, [refreshTrash]);
 
   const selectedCall = useMemo(
     () => calls.find((c) => c.id === selectedCallId) || null,
@@ -155,8 +184,28 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
     try {
       await api.deleteServiceCall(callId);
       setSelectedCallId(null);
-      await loadData();
-      showToast('Work order deleted');
+      await Promise.all([loadData(), refreshTrash()]);
+      showToast('Work order moved to Trash');
+    } catch (e: any) {
+      alert(`Error: ${e.message}`);
+    }
+  };
+
+  const handleRestoreCall = async (callId: string) => {
+    try {
+      await api.restoreServiceCall(callId);
+      await Promise.all([loadData(), refreshTrash()]);
+      showToast('Work order restored');
+    } catch (e: any) {
+      alert(`Error: ${e.message}`);
+    }
+  };
+
+  const handlePermanentlyDeleteCall = async (callId: string) => {
+    try {
+      await api.permanentlyDeleteServiceCall(callId);
+      await refreshTrash();
+      showToast('Work order permanently deleted');
     } catch (e: any) {
       alert(`Error: ${e.message}`);
     }
@@ -215,8 +264,28 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
     try {
       await api.deleteCommunication(id);
       setSelectedCommunicationId(null);
-      await loadData();
-      showToast('Ticket deleted');
+      await Promise.all([loadData(), refreshTrash()]);
+      showToast('Ticket moved to Trash');
+    } catch (e: any) {
+      alert(`Error: ${e.message}`);
+    }
+  };
+
+  const handleRestoreCommunication = async (id: string) => {
+    try {
+      await api.restoreCommunication(id);
+      await Promise.all([loadData(), refreshTrash()]);
+      showToast('Ticket restored');
+    } catch (e: any) {
+      alert(`Error: ${e.message}`);
+    }
+  };
+
+  const handlePermanentlyDeleteCommunication = async (id: string) => {
+    try {
+      await api.permanentlyDeleteCommunication(id);
+      await refreshTrash();
+      showToast('Ticket permanently deleted');
     } catch (e: any) {
       alert(`Error: ${e.message}`);
     }
@@ -337,6 +406,24 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
                   {team.length}
                 </span>
               </button>
+              <button
+                onClick={() => goToTab('trash')}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg font-medium text-left transition-colors mt-1 ${
+                  currentTab === 'trash' && !selectedCallId
+                    ? 'bg-[#0F5CC4] text-white font-bold'
+                    : 'text-gray-300 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Trash2 className="w-4 h-4 shrink-0" />
+                  <span>Trash</span>
+                </div>
+                {deletedCalls.length + deletedCommunications.length > 0 && (
+                  <span className="bg-white/10 text-gray-300 text-[10px] px-1.5 py-0.5 rounded font-mono">
+                    {deletedCalls.length + deletedCommunications.length}
+                  </span>
+                )}
+              </button>
             </>
           )}
         </nav>
@@ -368,6 +455,8 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
               ? `Job #${selectedCommunication.jobNumber} — Customer Service Ticket`
               : currentTab === 'team'
               ? 'Crew & Office Accounts'
+              : currentTab === 'trash'
+              ? 'Trash'
               : currentTab === 'communications'
               ? 'Customer Service Log'
               : 'All Service Calls'}
@@ -450,6 +539,15 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
                   onEditMember={(member) => setEditingMemberId(member.id)}
                 />
               </div>
+            ) : currentTab === 'trash' && isAdmin ? (
+              <TrashView
+                deletedCalls={deletedCalls}
+                deletedCommunications={deletedCommunications}
+                onRestoreCall={handleRestoreCall}
+                onPermanentlyDeleteCall={handlePermanentlyDeleteCall}
+                onRestoreCommunication={handleRestoreCommunication}
+                onPermanentlyDeleteCommunication={handlePermanentlyDeleteCommunication}
+              />
             ) : currentTab === 'communications' ? (
               <CommunicationsTable
                 communications={communications}

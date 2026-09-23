@@ -126,6 +126,10 @@ CREATE TABLE IF NOT EXISTS service_calls (
   created_by UUID NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Soft delete: "deleting" a call stamps these instead of removing the
+  -- row, so it stays recoverable from the admin-only Trash view.
+  deleted_at TIMESTAMPTZ NULL,
+  deleted_by UUID NULL REFERENCES profiles(id) ON DELETE SET NULL,
 
   CONSTRAINT completed_fields_present CHECK (
     (status <> 'completed')
@@ -144,6 +148,7 @@ CREATE INDEX IF NOT EXISTS idx_service_calls_reported_desc ON service_calls (rep
 CREATE INDEX IF NOT EXISTS idx_service_calls_open ON service_calls (status) WHERE status <> 'completed';
 CREATE INDEX IF NOT EXISTS idx_service_calls_job_number ON service_calls (job_number);
 CREATE INDEX IF NOT EXISTS idx_service_calls_client ON service_calls (client_id);
+CREATE INDEX IF NOT EXISTS idx_service_calls_deleted_at ON service_calls (deleted_at);
 
 -- 5. Attachments
 CREATE TABLE IF NOT EXISTS attachments (
@@ -221,13 +226,16 @@ DROP POLICY IF EXISTS "office and admin insert clients" ON clients;
 CREATE POLICY "office and admin insert clients" ON clients FOR INSERT
 WITH CHECK (auth_role() IN ('admin', 'office'));
 
--- service_calls: installers see only their own rows; admin/office see all.
+-- service_calls: installers see only their own rows (and never a
+-- soft-deleted one); admin/office see all, including deleted, so the Trash
+-- view can find them — the app filters deleted_at IS NULL for their normal
+-- list views.
 DROP POLICY IF EXISTS "installers read own calls" ON service_calls;
 CREATE POLICY "installers read own calls"
 ON service_calls FOR SELECT
 USING (
   auth_role() IN ('admin', 'office')
-  OR installer_id = auth.uid()
+  OR (installer_id = auth.uid() AND deleted_at IS NULL)
 );
 
 DROP POLICY IF EXISTS "office and admin insert" ON service_calls;
@@ -240,8 +248,11 @@ CREATE POLICY "office and admin update anything"
 ON service_calls FOR UPDATE
 USING (auth_role() IN ('admin', 'office'));
 
--- deleting a call is destructive (cascades to its attachments and notes),
--- so it's restricted to admins only, unlike insert/update above.
+-- The app's "delete" action is a soft delete (an UPDATE setting deleted_at/
+-- deleted_by — covered by the update policy above), so a call always stays
+-- recoverable from the Trash view. This DELETE policy backs the Trash
+-- view's separate "Delete Forever" action, which is truly destructive
+-- (cascades to attachments/notes), so it stays admin-only.
 DROP POLICY IF EXISTS "admin delete calls" ON service_calls;
 CREATE POLICY "admin delete calls"
 ON service_calls FOR DELETE
@@ -392,13 +403,18 @@ CREATE TABLE IF NOT EXISTS customer_communications (
   summary TEXT NOT NULL CHECK (length(summary) BETWEEN 3 AND 1000),
   created_by UUID NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Soft delete: "deleting" a ticket stamps these instead of removing the
+  -- row, so it stays recoverable from the admin-only Trash view.
+  deleted_at TIMESTAMPTZ NULL,
+  deleted_by UUID NULL REFERENCES profiles(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_comms_service_call ON customer_communications (service_call_id);
 CREATE INDEX IF NOT EXISTS idx_comms_date_received ON customer_communications (date_received DESC);
 CREATE INDEX IF NOT EXISTS idx_comms_status_open ON customer_communications (status) WHERE status <> 'closed';
 CREATE INDEX IF NOT EXISTS idx_comms_handled_by ON customer_communications (handled_by);
+CREATE INDEX IF NOT EXISTS idx_comms_deleted_at ON customer_communications (deleted_at);
 
 -- 3. communication_notes — append-only, timestamped update thread per
 -- ticket. No shared/internal split (unlike service_call_notes) since this
@@ -430,8 +446,11 @@ DROP POLICY IF EXISTS "office and admin update communications" ON customer_commu
 CREATE POLICY "office and admin update communications" ON customer_communications FOR UPDATE
 USING (auth_role() IN ('admin', 'office'));
 
--- Deleting a ticket is destructive (cascades to its notes), so — unlike
--- read/insert/update above — it's restricted to admins only.
+-- The app's "delete" action is a soft delete (an UPDATE setting deleted_at/
+-- deleted_by — covered by the update policy above), so a ticket always
+-- stays recoverable from the Trash view. This DELETE policy backs the Trash
+-- view's separate "Delete Forever" action, which is truly destructive
+-- (cascades to notes), so it stays admin-only.
 DROP POLICY IF EXISTS "admin delete communications" ON customer_communications;
 CREATE POLICY "admin delete communications" ON customer_communications FOR DELETE
 USING (auth_role() = 'admin');

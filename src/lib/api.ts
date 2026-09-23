@@ -176,6 +176,8 @@ async function mapServiceCall(row: any): Promise<ServiceCall> {
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
+    deletedByName: row.deleted_by_profile?.full_name || null,
     attachments,
     notes: notes.sort(
       (a: ServiceCallNote, b: ServiceCallNote) =>
@@ -189,6 +191,7 @@ const SERVICE_CALL_SELECT = `
   client:clients(*),
   installer:profiles!service_calls_installer_id_fkey(*),
   completed_by_profile:profiles!service_calls_completed_by_fkey(full_name),
+  deleted_by_profile:profiles!service_calls_deleted_by_fkey(full_name),
   attachments(*),
   notes:service_call_notes(*, author:profiles!service_call_notes_author_id_fkey(full_name, role))
 `;
@@ -411,6 +414,7 @@ export async function getServiceCalls(): Promise<ServiceCall[]> {
   const { data, error } = await supabase
     .from('service_calls')
     .select(SERVICE_CALL_SELECT)
+    .is('deleted_at', null)
     .order('reported_date', { ascending: false });
 
   if (error) throw new Error(friendlyDbError(error.message));
@@ -422,11 +426,29 @@ export async function getServiceCallById(callId: string): Promise<ServiceCall | 
     .from('service_calls')
     .select(SERVICE_CALL_SELECT)
     .eq('id', callId)
+    .is('deleted_at', null)
     .maybeSingle();
 
   if (error) throw new Error(friendlyDbError(error.message));
   if (!data) return null;
   return mapServiceCall(data);
+}
+
+/**
+ * Soft-deleted service calls, newest-deleted first — backs the admin-only
+ * Trash view. Admin/office bypass the deleted_at filter entirely at the RLS
+ * layer (see "installers read own calls" in supabase/schema.sql), so this
+ * just asks for the rows the normal list explicitly excludes.
+ */
+export async function getDeletedServiceCalls(): Promise<ServiceCall[]> {
+  const { data, error } = await supabase
+    .from('service_calls')
+    .select(SERVICE_CALL_SELECT)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false });
+
+  if (error) throw new Error(friendlyDbError(error.message));
+  return Promise.all((data || []).map(mapServiceCall));
 }
 
 export async function createServiceCall(input: {
@@ -525,12 +547,37 @@ export async function updateServiceCall(
 }
 
 /**
- * Permanently deletes a service call (and, via ON DELETE CASCADE, its
- * attachments and notes). Restricted to admins by the "admin delete calls"
- * RLS policy in supabase/schema.sql — this call will fail with a Postgres
- * permission error for any other role.
+ * Soft-deletes a service call: stamps deleted_at/deleted_by instead of
+ * removing the row, so it disappears from normal views but stays fully
+ * recoverable from the Trash view. Covered by the office/admin UPDATE
+ * policy on service_calls; the admin-only restriction is enforced by the
+ * UI (only admins see the delete button).
  */
 export async function deleteServiceCall(callId: string): Promise<void> {
+  const profile = await getCurrentProfile();
+  const { error } = await supabase
+    .from('service_calls')
+    .update({ deleted_at: new Date().toISOString(), deleted_by: profile?.id || null })
+    .eq('id', callId);
+  if (error) throw new Error(friendlyDbError(error.message));
+}
+
+/** Undoes a soft delete, putting the call back in every normal view. */
+export async function restoreServiceCall(callId: string): Promise<void> {
+  const { error } = await supabase
+    .from('service_calls')
+    .update({ deleted_at: null, deleted_by: null })
+    .eq('id', callId);
+  if (error) throw new Error(friendlyDbError(error.message));
+}
+
+/**
+ * Permanently deletes a service call (and, via ON DELETE CASCADE, its
+ * attachments and notes) — irreversible. Restricted to admins by the
+ * "admin delete calls" RLS policy in supabase/schema.sql. Only reachable
+ * from the Trash view's "Delete Forever" action.
+ */
+export async function permanentlyDeleteServiceCall(callId: string): Promise<void> {
   const { error } = await supabase.from('service_calls').delete().eq('id', callId);
   if (error) throw new Error(friendlyDbError(error.message));
 }
@@ -763,6 +810,8 @@ function mapCommunication(row: any): CustomerCommunication {
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
+    deletedByName: row.deleted_by_profile?.full_name || null,
     notes: notes.sort(
       (a: CommunicationNote, b: CommunicationNote) =>
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -774,6 +823,7 @@ const COMMUNICATION_SELECT = `
   *,
   service_call:service_calls(job_number, client:clients(name, phone)),
   handled_by_profile:profiles!customer_communications_handled_by_fkey(full_name),
+  deleted_by_profile:profiles!customer_communications_deleted_by_fkey(full_name),
   notes:communication_notes(*, author:profiles!communication_notes_author_id_fkey(full_name))
 `;
 
@@ -781,6 +831,7 @@ export async function getCommunications(): Promise<CustomerCommunication[]> {
   const { data, error } = await supabase
     .from('customer_communications')
     .select(COMMUNICATION_SELECT)
+    .is('deleted_at', null)
     .order('date_received', { ascending: false });
 
   if (error) throw new Error(friendlyDbError(error.message));
@@ -792,6 +843,7 @@ export async function getCommunicationsForServiceCall(serviceCallId: string): Pr
     .from('customer_communications')
     .select(COMMUNICATION_SELECT)
     .eq('service_call_id', serviceCallId)
+    .is('deleted_at', null)
     .order('date_received', { ascending: false });
 
   if (error) throw new Error(friendlyDbError(error.message));
@@ -803,11 +855,27 @@ export async function getCommunicationById(id: string): Promise<CustomerCommunic
     .from('customer_communications')
     .select(COMMUNICATION_SELECT)
     .eq('id', id)
+    .is('deleted_at', null)
     .maybeSingle();
 
   if (error) throw new Error(friendlyDbError(error.message));
   if (!data) return null;
   return mapCommunication(data);
+}
+
+/**
+ * Soft-deleted communication tickets, newest-deleted first — backs the
+ * admin-only Trash view.
+ */
+export async function getDeletedCommunications(): Promise<CustomerCommunication[]> {
+  const { data, error } = await supabase
+    .from('customer_communications')
+    .select(COMMUNICATION_SELECT)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false });
+
+  if (error) throw new Error(friendlyDbError(error.message));
+  return (data || []).map(mapCommunication);
 }
 
 export async function createCommunication(input: {
@@ -864,12 +932,37 @@ export async function updateCommunication(
 }
 
 /**
- * Permanently deletes a logged customer service ticket (and, via ON DELETE
- * CASCADE, its update notes). Restricted to admins by the
- * "admin delete communications" RLS policy — this call fails with a
- * Postgres permission error for any other role.
+ * Soft-deletes a communication ticket: stamps deleted_at/deleted_by instead
+ * of removing the row, so it disappears from normal views but stays fully
+ * recoverable from the Trash view. Covered by the office/admin UPDATE
+ * policy on customer_communications; the admin-only restriction is
+ * enforced by the UI (only admins see the delete button).
  */
 export async function deleteCommunication(id: string): Promise<void> {
+  const profile = await getCurrentProfile();
+  const { error } = await supabase
+    .from('customer_communications')
+    .update({ deleted_at: new Date().toISOString(), deleted_by: profile?.id || null })
+    .eq('id', id);
+  if (error) throw new Error(friendlyDbError(error.message));
+}
+
+/** Undoes a soft delete, putting the ticket back in every normal view. */
+export async function restoreCommunication(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('customer_communications')
+    .update({ deleted_at: null, deleted_by: null })
+    .eq('id', id);
+  if (error) throw new Error(friendlyDbError(error.message));
+}
+
+/**
+ * Permanently deletes a logged customer service ticket (and, via ON DELETE
+ * CASCADE, its update notes) — irreversible. Restricted to admins by the
+ * "admin delete communications" RLS policy. Only reachable from the Trash
+ * view's "Delete Forever" action.
+ */
+export async function permanentlyDeleteCommunication(id: string): Promise<void> {
   const { error } = await supabase.from('customer_communications').delete().eq('id', id);
   if (error) throw new Error(friendlyDbError(error.message));
 }

@@ -45,14 +45,14 @@ export function getDaysOpen(reportedDate: string): number {
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
 
-// Display label + color for a "next follow-up" date pill: red once it's
-// overdue, amber for today, neutral for anything still upcoming. Returns
-// null when there's no follow-up date set, so callers can render a plain
-// dash instead of a pill.
+// Display label + color for a "next follow-up" date pill: green once it's
+// still upcoming (we're good), yellow the day it's due, red once overdue.
+// Returns null when there's no follow-up date set, so callers can render a
+// plain dash instead of a pill.
 export function getFollowUpMeta(dateString?: string | null): { label: string; classes: string } | null {
   if (!dateString) return null;
   const parts = dateString.split('T')[0].split('-');
-  if (parts.length !== 3) return { label: dateString, classes: 'bg-[#F0F2F0] text-[#3A424B]' };
+  if (parts.length !== 3) return { label: dateString, classes: 'bg-emerald-50 text-emerald-700' };
 
   const due = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
   const today = new Date();
@@ -62,8 +62,8 @@ export function getFollowUpMeta(dateString?: string | null): { label: string; cl
   const label = formatDate(dateString);
 
   if (diffDays < 0) return { label, classes: 'bg-red-50 text-red-700' };
-  if (diffDays === 0) return { label: `${label} · Today`, classes: 'bg-amber-50 text-amber-700' };
-  return { label, classes: 'bg-[#F0F2F0] text-[#3A424B]' };
+  if (diffDays === 0) return { label: `${label} · Today`, classes: 'bg-yellow-100 text-yellow-800' };
+  return { label, classes: 'bg-emerald-50 text-emerald-700' };
 }
 
 export function formatBytes(bytes: number): string {

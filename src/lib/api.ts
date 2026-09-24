@@ -172,7 +172,7 @@ async function mapServiceCall(row: any): Promise<ServiceCall> {
     completedAt: row.completed_at,
     completedBy: row.completed_by,
     completedByName: row.completed_by_profile?.full_name || null,
-    dueDate: row.due_date,
+    nextFollowUpDate: row.next_follow_up_date,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -501,6 +501,7 @@ export async function updateServiceCall(
     responsibility?: Responsibility;
     billing?: BillingType;
     status?: CallStatus;
+    nextFollowUpDate?: string | null;
   }
 ): Promise<ServiceCall> {
   const previous = await getServiceCallById(callId);
@@ -529,6 +530,7 @@ export async function updateServiceCall(
       responsibility: updates.responsibility,
       billing: updates.billing,
       status: updates.status,
+      next_follow_up_date: updates.nextFollowUpDate,
       updated_at: new Date().toISOString(),
       ...completedStamp,
     })
@@ -803,6 +805,7 @@ function mapCommunication(row: any): CustomerCommunication {
     handledBy: row.handled_by,
     handledByName: row.handled_by_profile?.full_name,
     summary: row.summary,
+    nextFollowUpDate: row.next_follow_up_date,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -912,6 +915,7 @@ export async function updateCommunication(
     handledBy?: string;
     method?: CommunicationMethod;
     summary?: string;
+    nextFollowUpDate?: string | null;
   }
 ): Promise<CustomerCommunication> {
   const { data, error } = await supabase
@@ -921,6 +925,7 @@ export async function updateCommunication(
       handled_by: updates.handledBy,
       method: updates.method,
       summary: updates.summary?.trim(),
+      next_follow_up_date: updates.nextFollowUpDate,
     })
     .eq('id', id)
     .select(COMMUNICATION_SELECT)

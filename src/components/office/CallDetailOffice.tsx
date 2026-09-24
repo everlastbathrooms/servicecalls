@@ -65,6 +65,7 @@ export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
   const [selectedResponsibility, setSelectedResponsibility] = useState(call.responsibility);
   const [selectedBilling, setSelectedBilling] = useState(call.billing);
   const [selectedStatus, setSelectedStatus] = useState(call.status);
+  const [selectedNextFollowUpDate, setSelectedNextFollowUpDate] = useState(call.nextFollowUpDate || '');
   const [isSaved, setIsSaved] = useState(false);
 
   // Note states
@@ -85,6 +86,7 @@ export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
       responsibility: selectedResponsibility,
       billing: selectedBilling,
       status: selectedStatus,
+      nextFollowUpDate: selectedNextFollowUpDate || null,
     });
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
@@ -474,6 +476,17 @@ export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
                 <option value="paid">Paid</option>
                 <option value="undecided">Undecided</option>
               </select>
+            </div>
+
+            {/* Next Follow-Up */}
+            <div>
+              <label className="block text-[11px] text-[#6B7A88] mb-1">Next Follow-Up</label>
+              <input
+                type="date"
+                value={selectedNextFollowUpDate}
+                onChange={(e) => setSelectedNextFollowUpDate(e.target.value)}
+                className="w-full text-xs p-2.5 bg-[#FBFBF9] border border-[#DFE2DE] rounded-lg font-medium text-[#12161A] outline-none"
+              />
             </div>
 
             <button

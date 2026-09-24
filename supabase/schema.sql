@@ -122,7 +122,9 @@ CREATE TABLE IF NOT EXISTS service_calls (
   completion_note TEXT NULL,
   completed_at TIMESTAMPTZ NULL,
   completed_by UUID NULL REFERENCES profiles(id) ON DELETE SET NULL,
-  due_date DATE NULL,
+  -- When this job next needs attention — lets the table be sorted/filtered
+  -- by priority of follow-up rather than just reported date.
+  next_follow_up_date DATE NULL,
   created_by UUID NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -149,6 +151,7 @@ CREATE INDEX IF NOT EXISTS idx_service_calls_open ON service_calls (status) WHER
 CREATE INDEX IF NOT EXISTS idx_service_calls_job_number ON service_calls (job_number);
 CREATE INDEX IF NOT EXISTS idx_service_calls_client ON service_calls (client_id);
 CREATE INDEX IF NOT EXISTS idx_service_calls_deleted_at ON service_calls (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_service_calls_follow_up ON service_calls (next_follow_up_date) WHERE next_follow_up_date IS NOT NULL;
 
 -- 5. Attachments
 CREATE TABLE IF NOT EXISTS attachments (
@@ -435,6 +438,9 @@ CREATE TABLE IF NOT EXISTS customer_communications (
   status communication_status NOT NULL DEFAULT 'open',
   handled_by UUID NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
   summary TEXT NOT NULL CHECK (length(summary) BETWEEN 3 AND 1000),
+  -- When this ticket next needs attention — lets the log be sorted/filtered
+  -- by priority of follow-up rather than just date received.
+  next_follow_up_date DATE NULL,
   created_by UUID NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -450,6 +456,7 @@ CREATE INDEX IF NOT EXISTS idx_comms_date_received ON customer_communications (d
 CREATE INDEX IF NOT EXISTS idx_comms_status_open ON customer_communications (status) WHERE status <> 'closed';
 CREATE INDEX IF NOT EXISTS idx_comms_handled_by ON customer_communications (handled_by);
 CREATE INDEX IF NOT EXISTS idx_comms_deleted_at ON customer_communications (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_comms_follow_up ON customer_communications (next_follow_up_date) WHERE next_follow_up_date IS NOT NULL;
 
 -- 3. communication_notes — append-only, timestamped update thread per
 -- ticket. No shared/internal split (unlike service_call_notes) since this

@@ -71,7 +71,7 @@ export interface ServiceCall {
   completedAt?: string | null;
   completedBy?: string | null;
   completedByName?: string | null;
-  dueDate?: string | null;
+  nextFollowUpDate?: string | null; // YYYY-MM-DD
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -118,6 +118,7 @@ export interface CustomerCommunication {
   handledBy: string;
   handledByName?: string;
   summary: string;
+  nextFollowUpDate?: string | null; // YYYY-MM-DD
   createdBy: string;
   createdAt: string;
   updatedAt: string;

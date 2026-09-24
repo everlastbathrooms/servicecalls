@@ -45,6 +45,27 @@ export function getDaysOpen(reportedDate: string): number {
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
 
+// Display label + color for a "next follow-up" date pill: red once it's
+// overdue, amber for today, neutral for anything still upcoming. Returns
+// null when there's no follow-up date set, so callers can render a plain
+// dash instead of a pill.
+export function getFollowUpMeta(dateString?: string | null): { label: string; classes: string } | null {
+  if (!dateString) return null;
+  const parts = dateString.split('T')[0].split('-');
+  if (parts.length !== 3) return { label: dateString, classes: 'bg-[#F0F2F0] text-[#3A424B]' };
+
+  const due = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  due.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const label = formatDate(dateString);
+
+  if (diffDays < 0) return { label, classes: 'bg-red-50 text-red-700' };
+  if (diffDays === 0) return { label: `${label} · Today`, classes: 'bg-amber-50 text-amber-700' };
+  return { label, classes: 'bg-[#F0F2F0] text-[#3A424B]' };
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
   const k = 1024;

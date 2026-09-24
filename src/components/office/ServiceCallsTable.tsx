@@ -25,6 +25,7 @@ import {
   formatDate,
   formatRelativeDate,
   getDaysOpen,
+  getFollowUpMeta,
   getPriorityBorderColor,
   getStatusBadge,
 } from '../../lib/utils';
@@ -62,6 +63,7 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
     | 'installer'
     | 'installDate'
     | 'description'
+    | 'nextFollowUpDate'
     | 'priority'
     | 'responsibility'
     | 'billing'
@@ -144,6 +146,11 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
       if (sortField === 'description') {
         const cmp = a.description.localeCompare(b.description);
         return sortAsc ? cmp : -cmp;
+      }
+      if (sortField === 'nextFollowUpDate') {
+        const timeA = a.nextFollowUpDate ? new Date(a.nextFollowUpDate).getTime() : Infinity;
+        const timeB = b.nextFollowUpDate ? new Date(b.nextFollowUpDate).getTime() : Infinity;
+        return sortAsc ? timeA - timeB : timeB - timeA;
       }
       if (sortField === 'responsibility') {
         const cmp = a.responsibility.localeCompare(b.responsibility);
@@ -360,6 +367,15 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
                   </div>
                 </th>
                 <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'nextFollowUpDate' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('nextFollowUpDate')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Next Follow-Up</span>
+                    <SortIcon field="nextFollowUpDate" />
+                  </div>
+                </th>
+                <th
                   className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'installer' ? 'text-[#12161A]' : ''}`}
                   onClick={() => toggleSort('installer')}
                 >
@@ -430,6 +446,7 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
                       : daysOpen >= 3
                       ? 'bg-amber-50 text-amber-700'
                       : 'bg-[#F0F2F0] text-[#3A424B]';
+                  const followUpMeta = getFollowUpMeta(call.nextFollowUpDate);
 
                   return (
                     <tr
@@ -479,6 +496,19 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
                         >
                           {daysOpen} {daysOpen === 1 ? 'day' : 'days'}
                         </span>
+                      </td>
+
+                      {/* Next Follow-Up */}
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        {followUpMeta ? (
+                          <span
+                            className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-full ${followUpMeta.classes}`}
+                          >
+                            {followUpMeta.label}
+                          </span>
+                        ) : (
+                          <span className="text-[#6B7A88]">—</span>
+                        )}
                       </td>
 
                       {/* Assigned Crew */}
@@ -544,7 +574,7 @@ export const ServiceCallsTable: React.FC<ServiceCallsTableProps> = ({
                 })
               ) : (
                 <tr>
-                  <td colSpan={13} className="py-12 text-center text-[#6B7A88]">
+                  <td colSpan={14} className="py-12 text-center text-[#6B7A88]">
                     <p className="text-sm font-medium">No service calls found matching filters.</p>
                     <button
                       onClick={onCreateCall}

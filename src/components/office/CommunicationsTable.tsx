@@ -6,6 +6,7 @@ import {
   formatRelativeDate,
   getCommunicationMethodLabel,
   getCommunicationStatusBadge,
+  getFollowUpMeta,
 } from '../../lib/utils';
 
 interface CommunicationsTableProps {
@@ -27,7 +28,15 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
   const [statusFilter, setStatusFilter] = useState(DEFAULT_STATUS_FILTER);
   const [methodFilter, setMethodFilter] = useState('all');
 
-  type SortField = 'dateReceived' | 'jobNumber' | 'client' | 'method' | 'summary' | 'handledBy' | 'status';
+  type SortField =
+    | 'dateReceived'
+    | 'jobNumber'
+    | 'client'
+    | 'method'
+    | 'summary'
+    | 'handledBy'
+    | 'nextFollowUpDate'
+    | 'status';
   const [sortField, setSortField] = useState<SortField>('dateReceived');
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -94,6 +103,11 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
         if (sortField === 'handledBy') {
           const cmp = (a.handledByName || '').localeCompare(b.handledByName || '');
           return sortAsc ? cmp : -cmp;
+        }
+        if (sortField === 'nextFollowUpDate') {
+          const timeA = a.nextFollowUpDate ? new Date(a.nextFollowUpDate).getTime() : Infinity;
+          const timeB = b.nextFollowUpDate ? new Date(b.nextFollowUpDate).getTime() : Infinity;
+          return sortAsc ? timeA - timeB : timeB - timeA;
         }
         if (sortField === 'status') {
           const cmp = a.status.localeCompare(b.status);
@@ -234,6 +248,15 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
                   </div>
                 </th>
                 <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'nextFollowUpDate' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('nextFollowUpDate')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Next Follow-Up</span>
+                    <SortIcon field="nextFollowUpDate" />
+                  </div>
+                </th>
+                <th
                   className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'status' ? 'text-[#12161A]' : ''}`}
                   onClick={() => toggleSort('status')}
                 >
@@ -249,6 +272,7 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
               {filtered.length > 0 ? (
                 filtered.map((c) => {
                   const badge = getCommunicationStatusBadge(c.status);
+                  const followUpMeta = getFollowUpMeta(c.nextFollowUpDate);
                   return (
                     <tr
                       key={c.id}
@@ -278,6 +302,17 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
                         {c.handledByName || '—'}
                       </td>
                       <td className="py-3 px-3 whitespace-nowrap">
+                        {followUpMeta ? (
+                          <span
+                            className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-full ${followUpMeta.classes}`}
+                          >
+                            {followUpMeta.label}
+                          </span>
+                        ) : (
+                          <span className="text-[#6B7A88]">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap">
                         <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full ${badge.bg} ${badge.text}`}>
                           {badge.label}
                         </span>
@@ -290,7 +325,7 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
                 })
               ) : (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-[#6B7A88]">
+                  <td colSpan={9} className="py-12 text-center text-[#6B7A88]">
                     <p className="text-sm font-medium">No customer service tickets logged matching filters.</p>
                     <button
                       onClick={onCreate}

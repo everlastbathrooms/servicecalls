@@ -162,6 +162,7 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
         responsibility: updates.responsibility,
         billing: updates.billing,
         status: updates.status,
+        nextFollowUpDate: updates.nextFollowUpDate,
       });
       await loadData();
       showToast('Work order updated');
@@ -239,7 +240,12 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
 
   const handleUpdateCommunication = async (
     id: string,
-    updates: { status?: CommunicationStatus; handledBy?: string; method?: CommunicationMethod }
+    updates: {
+      status?: CommunicationStatus;
+      handledBy?: string;
+      method?: CommunicationMethod;
+      nextFollowUpDate?: string | null;
+    }
   ) => {
     try {
       await api.updateCommunication(id, updates);

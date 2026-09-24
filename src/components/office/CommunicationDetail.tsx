@@ -8,7 +8,15 @@ interface CommunicationDetailProps {
   team: UserProfile[];
   isAdmin: boolean;
   onBack: () => void;
-  onUpdate: (id: string, updates: { status?: CommunicationStatus; handledBy?: string; method?: CommunicationMethod }) => void;
+  onUpdate: (
+    id: string,
+    updates: {
+      status?: CommunicationStatus;
+      handledBy?: string;
+      method?: CommunicationMethod;
+      nextFollowUpDate?: string | null;
+    }
+  ) => void;
   onAddNote: (id: string, body: string) => void;
   onViewJob?: (serviceCallId: string) => void;
   onDeleteCommunication: (id: string) => void;
@@ -27,13 +35,14 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
   const [status, setStatus] = useState(communication.status);
   const [handledBy, setHandledBy] = useState(communication.handledBy);
   const [method, setMethod] = useState(communication.method);
+  const [nextFollowUpDate, setNextFollowUpDate] = useState(communication.nextFollowUpDate || '');
   const [isSaved, setIsSaved] = useState(false);
   const [noteBody, setNoteBody] = useState('');
 
   const badge = getCommunicationStatusBadge(communication.status);
 
   const handleSave = () => {
-    onUpdate(communication.id, { status, handledBy, method });
+    onUpdate(communication.id, { status, handledBy, method, nextFollowUpDate: nextFollowUpDate || null });
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };
@@ -197,6 +206,16 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] text-[#6B7A88] mb-1">Next Follow-Up</label>
+              <input
+                type="date"
+                value={nextFollowUpDate}
+                onChange={(e) => setNextFollowUpDate(e.target.value)}
+                className="w-full text-xs p-2.5 bg-[#FBFBF9] border border-[#DFE2DE] rounded-lg font-medium text-[#12161A] outline-none"
+              />
             </div>
 
             <button

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Phone,
@@ -16,6 +16,8 @@ import {
   Share2,
   Trash2,
   Headset,
+  History as HistoryIcon,
+  FilePlus2,
 } from 'lucide-react';
 import {
   Attachment,
@@ -28,7 +30,8 @@ import {
 } from '../../types';
 import {
   formatDate,
-  formatRelativeDate,
+  formatDateTime,
+  formatRelativeDateTime,
   getPriorityBorderColor,
   getStatusBadge,
 } from '../../lib/utils';
@@ -78,6 +81,32 @@ export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
 
   const reportedAttachments = (call.attachments || []).filter((a) => a.phase === 'reported');
   const resolutionAttachments = (call.attachments || []).filter((a) => a.phase === 'resolution');
+
+  const history = useMemo(() => {
+    const events: { key: string; icon: React.ReactNode; label: string; at: string }[] = [
+      {
+        key: 'created',
+        icon: <FilePlus2 className="w-3.5 h-3.5 text-[#0F5CC4]" />,
+        label: `${call.createdByName || 'Someone'} created this work order`,
+        at: call.createdAt,
+      },
+      ...(call.notes || []).map((note) => ({
+        key: `note-${note.id}`,
+        icon: <MessageSquare className="w-3.5 h-3.5 text-[#6B7A88]" />,
+        label: `${note.authorName} added a note`,
+        at: note.createdAt,
+      })),
+    ];
+    if (call.completedAt) {
+      events.push({
+        key: 'completed',
+        icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />,
+        label: `${call.completedByName || 'Someone'} marked this completed`,
+        at: call.completedAt,
+      });
+    }
+    return events.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+  }, [call.createdAt, call.createdByName, call.notes, call.completedAt, call.completedByName]);
 
   const handleSaveEdits = () => {
     onUpdateCall(call.id, {
@@ -327,7 +356,7 @@ export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
                         )}
                       </div>
                       <span className="text-[10px] text-[#6B7A88]">
-                        {formatRelativeDate(note.createdAt)}
+                        {formatRelativeDateTime(note.createdAt)}
                       </span>
                     </div>
                     <p className="text-[#3A424B] leading-relaxed whitespace-pre-wrap">{note.body}</p>
@@ -529,10 +558,29 @@ export const CallDetailOffice: React.FC<CallDetailOfficeProps> = ({
             <div className="pt-2 border-t border-[#DFE2DE] text-[11px] text-[#6B7A88] space-y-1">
               <div>Reported: {formatDate(call.reportedDate)}</div>
               <div>Installed: {formatDate(call.installDate)}</div>
-              <div>Logged by: Office</div>
+              <div>Logged: {formatDateTime(call.createdAt)}{call.createdByName ? ` by ${call.createdByName}` : ''}</div>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Audit Trail / History */}
+      <div className="bg-white p-5 rounded-xl border border-[#DFE2DE] shadow-xs">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-[#3A424B] mb-3 flex items-center gap-2">
+          <HistoryIcon className="w-4 h-4 text-[#0F5CC4]" />
+          <span>History</span>
+        </h2>
+        <ul className="space-y-2.5">
+          {history.map((event) => (
+            <li key={event.key} className="flex items-start gap-2.5 text-xs">
+              <span className="mt-0.5">{event.icon}</span>
+              <span className="text-[#3A424B]">
+                <span className="font-semibold text-[#12161A]">{event.label}</span>
+                <span className="text-[#6B7A88]"> — {formatDateTime(event.at)}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <MediaLightbox

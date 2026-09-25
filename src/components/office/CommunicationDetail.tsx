@@ -1,7 +1,13 @@
-import React, { useState } from 'react';
-import { ArrowLeft, MessageSquare, CheckCircle2, ExternalLink, Trash2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ArrowLeft, MessageSquare, CheckCircle2, ExternalLink, Trash2, History as HistoryIcon, FilePlus2 } from 'lucide-react';
 import { CommunicationMethod, CommunicationStatus, CustomerCommunication, UserProfile } from '../../types';
-import { formatDate, formatRelativeDate, getCommunicationMethodLabel, getCommunicationStatusBadge } from '../../lib/utils';
+import {
+  formatDate,
+  formatDateTime,
+  formatRelativeDateTime,
+  getCommunicationMethodLabel,
+  getCommunicationStatusBadge,
+} from '../../lib/utils';
 
 interface CommunicationDetailProps {
   communication: CustomerCommunication;
@@ -40,6 +46,24 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
   const [noteBody, setNoteBody] = useState('');
 
   const badge = getCommunicationStatusBadge(communication.status);
+
+  const history = useMemo(() => {
+    const events: { key: string; icon: React.ReactNode; label: string; at: string }[] = [
+      {
+        key: 'created',
+        icon: <FilePlus2 className="w-3.5 h-3.5 text-[#0F5CC4]" />,
+        label: `${communication.createdByName || 'Someone'} created this ticket`,
+        at: communication.createdAt,
+      },
+      ...(communication.notes || []).map((note) => ({
+        key: `note-${note.id}`,
+        icon: <MessageSquare className="w-3.5 h-3.5 text-[#6B7A88]" />,
+        label: `${note.authorName} added an update`,
+        at: note.createdAt,
+      })),
+    ];
+    return events.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+  }, [communication.createdAt, communication.createdByName, communication.notes]);
 
   const handleSave = () => {
     onUpdate(communication.id, { status, handledBy, method, nextFollowUpDate: nextFollowUpDate || null });
@@ -129,7 +153,7 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
                   <div key={note.id} className="p-3.5 rounded-lg border bg-[#FBFBF9] border-[#DFE2DE] text-xs space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-[#12161A]">{note.authorName}</span>
-                      <span className="text-[10px] text-[#6B7A88]">{formatRelativeDate(note.createdAt)}</span>
+                      <span className="text-[10px] text-[#6B7A88]">{formatRelativeDateTime(note.createdAt)}</span>
                     </div>
                     <p className="text-[#3A424B] leading-relaxed whitespace-pre-wrap">{note.body}</p>
                   </div>
@@ -259,10 +283,29 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
             )}
             <div className="pt-2 border-t border-[#DFE2DE] text-[11px] text-[#6B7A88] space-y-1">
               <div>Received: {formatDate(communication.dateReceived)}</div>
-              <div>Logged: {formatDate(communication.createdAt)}</div>
+              <div>Logged: {formatDateTime(communication.createdAt)}</div>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Audit Trail / History */}
+      <div className="bg-white p-5 rounded-xl border border-[#DFE2DE] shadow-xs">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-[#3A424B] mb-3 flex items-center gap-2">
+          <HistoryIcon className="w-4 h-4 text-[#0F5CC4]" />
+          <span>History</span>
+        </h2>
+        <ul className="space-y-2.5">
+          {history.map((event) => (
+            <li key={event.key} className="flex items-start gap-2.5 text-xs">
+              <span className="mt-0.5">{event.icon}</span>
+              <span className="text-[#3A424B]">
+                <span className="font-semibold text-[#12161A]">{event.label}</span>
+                <span className="text-[#6B7A88]"> — {formatDateTime(event.at)}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

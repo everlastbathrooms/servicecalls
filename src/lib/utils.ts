@@ -36,6 +36,44 @@ export function formatRelativeDate(dateString?: string | null): string {
   }
 }
 
+// Full date + time of day, e.g. "Sep 25, 2026, 3:45 PM" — for timestamps
+// where the precise moment matters (audit trail, notes), not just the day.
+export function formatDateTime(dateString?: string | null): string {
+  if (!dateString) return '—';
+  try {
+    const date = new Date(dateString);
+    const datePart = date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    const timePart = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    return `${datePart}, ${timePart}`;
+  } catch {
+    return dateString;
+  }
+}
+
+// Relative day label plus time of day, e.g. "Today at 3:45 PM" or
+// "3 days ago at 9:12 AM" — used for note timestamps so they stay scannable
+// but still show exactly when within the day something happened.
+export function formatRelativeDateTime(dateString?: string | null): string {
+  if (!dateString) return '';
+  try {
+    const relative = formatRelativeDate(dateString);
+    const time = new Date(dateString).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    return `${relative} at ${time}`;
+  } catch {
+    return dateString;
+  }
+}
+
 // Whole calendar days between the reported date and now, for "how long has
 // this been sitting" at a glance in the calls table. Never negative.
 export function getDaysOpen(reportedDate: string): number {

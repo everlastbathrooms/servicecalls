@@ -174,6 +174,7 @@ async function mapServiceCall(row: any): Promise<ServiceCall> {
     completedByName: row.completed_by_profile?.full_name || null,
     nextFollowUpDate: row.next_follow_up_date,
     createdBy: row.created_by,
+    createdByName: row.created_by_profile?.full_name || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -191,6 +192,7 @@ const SERVICE_CALL_SELECT = `
   client:clients(*),
   installer:profiles!service_calls_installer_id_fkey(*),
   completed_by_profile:profiles!service_calls_completed_by_fkey(full_name),
+  created_by_profile:profiles!service_calls_created_by_fkey(full_name),
   deleted_by_profile:profiles!service_calls_deleted_by_fkey(full_name),
   attachments(*),
   notes:service_call_notes(*, author:profiles!service_call_notes_author_id_fkey(full_name, role))
@@ -807,6 +809,7 @@ function mapCommunication(row: any): CustomerCommunication {
     summary: row.summary,
     nextFollowUpDate: row.next_follow_up_date,
     createdBy: row.created_by,
+    createdByName: row.created_by_profile?.full_name || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -823,6 +826,7 @@ const COMMUNICATION_SELECT = `
   client:clients(name, phone),
   service_call:service_calls(job_number, client:clients(name, phone)),
   handled_by_profile:profiles!customer_communications_handled_by_fkey(full_name),
+  created_by_profile:profiles!customer_communications_created_by_fkey(full_name),
   deleted_by_profile:profiles!customer_communications_deleted_by_fkey(full_name),
   notes:communication_notes(*, author:profiles!communication_notes_author_id_fkey(full_name))
 `;

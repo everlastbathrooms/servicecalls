@@ -419,6 +419,15 @@ DO $$ BEGIN
   CREATE TYPE communication_status AS ENUM ('open', 'in_progress', 'resolved', 'closed');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DO $$ BEGIN
+  CREATE TYPE communication_request_type AS ENUM (
+    'order_status',
+    'installation_coordination',
+    'project_scope',
+    'other'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- 2. customer_communications — one row per logged customer service ticket.
 -- Logged against a client directly (client_id); service_call_id is only
 -- set when the ticket was started from a specific job's page — logging a
@@ -435,6 +444,10 @@ CREATE TABLE IF NOT EXISTS customer_communications (
   client_phone_snapshot TEXT,
   date_received DATE NOT NULL DEFAULT CURRENT_DATE,
   method communication_method NOT NULL,
+  -- Nullable: existing tickets stay blank rather than being backfilled;
+  -- required going forward is enforced by the app (Log Ticket form), not a
+  -- NOT NULL constraint here.
+  request_type communication_request_type NULL,
   status communication_status NOT NULL DEFAULT 'open',
   handled_by UUID NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
   summary TEXT NOT NULL CHECK (length(summary) BETWEEN 3 AND 1000),

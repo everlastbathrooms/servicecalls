@@ -8,6 +8,7 @@ import {
   Client,
   CommunicationMethod,
   CommunicationNote,
+  CommunicationRequestType,
   CommunicationStatus,
   CustomerCommunication,
   Responsibility,
@@ -803,6 +804,7 @@ function mapCommunication(row: any): CustomerCommunication {
     clientPhone: row.service_call?.client?.phone ?? row.client?.phone ?? row.client_phone_snapshot,
     dateReceived: row.date_received,
     method: row.method,
+    requestType: row.request_type,
     status: row.status,
     handledBy: row.handled_by,
     handledByName: row.handled_by_profile?.full_name,
@@ -887,6 +889,7 @@ export async function createCommunication(input: {
   serviceCallId?: string | null;
   dateReceived: string;
   method: CommunicationMethod;
+  requestType: CommunicationRequestType;
   handledBy: string;
   summary: string;
 }): Promise<CustomerCommunication> {
@@ -900,6 +903,7 @@ export async function createCommunication(input: {
       service_call_id: input.serviceCallId || null,
       date_received: input.dateReceived,
       method: input.method,
+      request_type: input.requestType,
       status: 'open',
       handled_by: input.handledBy,
       summary: input.summary.trim(),
@@ -918,6 +922,7 @@ export async function updateCommunication(
     status?: CommunicationStatus;
     handledBy?: string;
     method?: CommunicationMethod;
+    requestType?: CommunicationRequestType | null;
     summary?: string;
     nextFollowUpDate?: string | null;
   }
@@ -928,6 +933,7 @@ export async function updateCommunication(
       status: updates.status,
       handled_by: updates.handledBy,
       method: updates.method,
+      request_type: updates.requestType,
       summary: updates.summary?.trim(),
       next_follow_up_date: updates.nextFollowUpDate,
     })

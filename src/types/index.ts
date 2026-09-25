@@ -96,6 +96,11 @@ export interface NotificationLog {
 
 export type CommunicationMethod = 'phone' | 'email' | 'text' | 'in_person' | 'other';
 export type CommunicationStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+export type CommunicationRequestType =
+  | 'order_status'
+  | 'installation_coordination'
+  | 'project_scope'
+  | 'other';
 
 export interface CommunicationNote {
   id: string;
@@ -115,6 +120,7 @@ export interface CustomerCommunication {
   clientPhone?: string | null; // from the client, for display
   dateReceived: string; // YYYY-MM-DD
   method: CommunicationMethod;
+  requestType: CommunicationRequestType | null; // null on tickets logged before this field existed
   status: CommunicationStatus;
   handledBy: string;
   handledByName?: string;

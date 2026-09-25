@@ -5,6 +5,7 @@ import {
   formatDate,
   formatRelativeDate,
   getCommunicationMethodLabel,
+  getCommunicationRequestTypeBadge,
   getCommunicationStatusBadge,
   getFollowUpMeta,
 } from '../../lib/utils';
@@ -27,12 +28,14 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState(DEFAULT_STATUS_FILTER);
   const [methodFilter, setMethodFilter] = useState('all');
+  const [requestTypeFilter, setRequestTypeFilter] = useState('all');
 
   type SortField =
     | 'dateReceived'
     | 'jobNumber'
     | 'client'
     | 'method'
+    | 'requestType'
     | 'summary'
     | 'handledBy'
     | 'nextFollowUpDate'
@@ -76,6 +79,7 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
           }
         }
         if (methodFilter !== 'all' && c.method !== methodFilter) return false;
+        if (requestTypeFilter !== 'all' && c.requestType !== requestTypeFilter) return false;
         return true;
       })
       .sort((a, b) => {
@@ -94,6 +98,10 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
         }
         if (sortField === 'method') {
           const cmp = a.method.localeCompare(b.method);
+          return sortAsc ? cmp : -cmp;
+        }
+        if (sortField === 'requestType') {
+          const cmp = (a.requestType || '').localeCompare(b.requestType || '');
           return sortAsc ? cmp : -cmp;
         }
         if (sortField === 'summary') {
@@ -115,7 +123,7 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
         }
         return 0;
       });
-  }, [communications, searchQuery, statusFilter, methodFilter, sortField, sortAsc]);
+  }, [communications, searchQuery, statusFilter, methodFilter, requestTypeFilter, sortField, sortAsc]);
 
   return (
     <div className="space-y-4">
@@ -173,12 +181,28 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
             <option value="other">Other</option>
           </select>
 
-          {(searchQuery || statusFilter !== DEFAULT_STATUS_FILTER || methodFilter !== 'all') && (
+          <select
+            value={requestTypeFilter}
+            onChange={(e) => setRequestTypeFilter(e.target.value)}
+            className="px-2.5 py-1.5 bg-[#FBFBF9] border border-[#DFE2DE] rounded-lg text-xs font-medium text-[#12161A] outline-none"
+          >
+            <option value="all">All Request Types</option>
+            <option value="order_status">Order Status</option>
+            <option value="installation_coordination">Installation Coordination</option>
+            <option value="project_scope">Project / Scope Question</option>
+            <option value="other">Other</option>
+          </select>
+
+          {(searchQuery ||
+            statusFilter !== DEFAULT_STATUS_FILTER ||
+            methodFilter !== 'all' ||
+            requestTypeFilter !== 'all') && (
             <button
               onClick={() => {
                 setSearchQuery('');
                 setStatusFilter(DEFAULT_STATUS_FILTER);
                 setMethodFilter('all');
+                setRequestTypeFilter('all');
               }}
               className="text-xs text-[#0F5CC4] hover:underline font-medium ml-auto"
             >
@@ -230,6 +254,15 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
                   </div>
                 </th>
                 <th
+                  className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'requestType' ? 'text-[#12161A]' : ''}`}
+                  onClick={() => toggleSort('requestType')}
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Type</span>
+                    <SortIcon field="requestType" />
+                  </div>
+                </th>
+                <th
                   className={`py-3 px-3 cursor-pointer hover:text-[#12161A] ${sortField === 'summary' ? 'text-[#12161A]' : ''}`}
                   onClick={() => toggleSort('summary')}
                 >
@@ -272,6 +305,7 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
               {filtered.length > 0 ? (
                 filtered.map((c) => {
                   const badge = getCommunicationStatusBadge(c.status);
+                  const requestTypeBadge = c.requestType ? getCommunicationRequestTypeBadge(c.requestType) : null;
                   const followUpMeta = getFollowUpMeta(c.nextFollowUpDate);
                   return (
                     <tr
@@ -296,6 +330,17 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
                       </td>
                       <td className="py-3 px-3 text-[#3A424B] whitespace-nowrap">
                         {getCommunicationMethodLabel(c.method)}
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        {requestTypeBadge ? (
+                          <span
+                            className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full ${requestTypeBadge.bg} ${requestTypeBadge.text}`}
+                          >
+                            {requestTypeBadge.label}
+                          </span>
+                        ) : (
+                          <span className="text-[#6B7A88] italic">—</span>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-[#3A424B] max-w-[280px] truncate">{c.summary}</td>
                       <td className="py-3 px-3 text-[#3A424B] whitespace-nowrap">
@@ -325,7 +370,7 @@ export const CommunicationsTable: React.FC<CommunicationsTableProps> = ({
                 })
               ) : (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-[#6B7A88]">
+                  <td colSpan={10} className="py-12 text-center text-[#6B7A88]">
                     <p className="text-sm font-medium">No customer service tickets logged matching filters.</p>
                     <button
                       onClick={onCreate}

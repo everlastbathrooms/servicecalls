@@ -1,4 +1,11 @@
-import { CallPriority, CallStatus, CommunicationMethod, CommunicationStatus, ServiceCall } from '../types';
+import {
+  CallPriority,
+  CallStatus,
+  CommunicationMethod,
+  CommunicationRequestType,
+  CommunicationStatus,
+  ServiceCall,
+} from '../types';
 
 export function formatDate(dateString?: string | null): string {
   if (!dateString) return '—';
@@ -158,6 +165,35 @@ export function getCommunicationStatusBadge(
       return { label: 'Resolved', bg: 'bg-emerald-100', text: 'text-emerald-800' };
     case 'closed':
       return { label: 'Closed', bg: 'bg-gray-100', text: 'text-gray-600' };
+  }
+}
+
+export function getCommunicationRequestTypeLabel(type: CommunicationRequestType): string {
+  switch (type) {
+    case 'order_status':
+      return 'Order Status';
+    case 'installation_coordination':
+      return 'Installation Coordination';
+    case 'project_scope':
+      return 'Project / Scope Question';
+    case 'other':
+      return 'Other';
+  }
+}
+
+export function getCommunicationRequestTypeBadge(
+  type: CommunicationRequestType
+): { label: string; bg: string; text: string } {
+  const label = getCommunicationRequestTypeLabel(type);
+  switch (type) {
+    case 'order_status':
+      return { label, bg: 'bg-[#0F5CC4]/10', text: 'text-[#0F5CC4]' };
+    case 'installation_coordination':
+      return { label, bg: 'bg-purple-100', text: 'text-purple-800' };
+    case 'project_scope':
+      return { label, bg: 'bg-amber-100', text: 'text-amber-800' };
+    case 'other':
+      return { label, bg: 'bg-gray-100', text: 'text-gray-600' };
   }
 }
 

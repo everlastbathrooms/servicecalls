@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, CheckCircle2, AlertCircle } from 'lucide-react';
-import { Client, CommunicationMethod, ServiceCall, UserProfile } from '../../types';
+import { Client, CommunicationMethod, CommunicationRequestType, ServiceCall, UserProfile } from '../../types';
 import * as api from '../../lib/api';
 
 interface CreateCommunicationModalProps {
@@ -33,6 +33,7 @@ export const CreateCommunicationModal: React.FC<CreateCommunicationModalProps> =
 
   const [dateReceived, setDateReceived] = useState(new Date().toISOString().split('T')[0]);
   const [method, setMethod] = useState<CommunicationMethod>('phone');
+  const [requestType, setRequestType] = useState<CommunicationRequestType>('order_status');
   const [handledBy, setHandledBy] = useState(currentUser.id);
   const [summary, setSummary] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,6 +57,7 @@ export const CreateCommunicationModal: React.FC<CreateCommunicationModalProps> =
     setNewClientAddress('');
     setDateReceived(new Date().toISOString().split('T')[0]);
     setMethod('phone');
+    setRequestType('order_status');
     setHandledBy(currentUser.id);
     setSummary('');
     setError('');
@@ -124,6 +126,7 @@ export const CreateCommunicationModal: React.FC<CreateCommunicationModalProps> =
         serviceCallId: presetServiceCallId || null,
         dateReceived,
         method,
+        requestType,
         handledBy,
         summary: summary.trim(),
       });
@@ -276,7 +279,7 @@ export const CreateCommunicationModal: React.FC<CreateCommunicationModalProps> =
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-[#3A424B] mb-1">
                 Date Received
@@ -303,6 +306,22 @@ export const CreateCommunicationModal: React.FC<CreateCommunicationModalProps> =
                 <option value="email">Email</option>
                 <option value="text">Text</option>
                 <option value="in_person">In Person</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#3A424B] mb-1">
+                Type of Request
+              </label>
+              <select
+                value={requestType}
+                onChange={(e) => setRequestType(e.target.value as CommunicationRequestType)}
+                className="w-full text-xs p-2.5 bg-white border border-[#DFE2DE] rounded-lg focus:border-[#0F5CC4] outline-none font-medium"
+              >
+                <option value="order_status">Order Status</option>
+                <option value="installation_coordination">Installation Coordination</option>
+                <option value="project_scope">Project / Scope Question</option>
                 <option value="other">Other</option>
               </select>
             </div>

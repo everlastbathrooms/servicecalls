@@ -1,11 +1,18 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowLeft, MessageSquare, CheckCircle2, ExternalLink, Trash2, History as HistoryIcon, FilePlus2 } from 'lucide-react';
-import { CommunicationMethod, CommunicationStatus, CustomerCommunication, UserProfile } from '../../types';
+import {
+  CommunicationMethod,
+  CommunicationRequestType,
+  CommunicationStatus,
+  CustomerCommunication,
+  UserProfile,
+} from '../../types';
 import {
   formatDate,
   formatDateTime,
   formatRelativeDateTime,
   getCommunicationMethodLabel,
+  getCommunicationRequestTypeBadge,
   getCommunicationStatusBadge,
 } from '../../lib/utils';
 
@@ -20,6 +27,7 @@ interface CommunicationDetailProps {
       status?: CommunicationStatus;
       handledBy?: string;
       method?: CommunicationMethod;
+      requestType?: CommunicationRequestType | null;
       nextFollowUpDate?: string | null;
     }
   ) => void;
@@ -41,11 +49,15 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
   const [status, setStatus] = useState(communication.status);
   const [handledBy, setHandledBy] = useState(communication.handledBy);
   const [method, setMethod] = useState(communication.method);
+  const [requestType, setRequestType] = useState(communication.requestType);
   const [nextFollowUpDate, setNextFollowUpDate] = useState(communication.nextFollowUpDate || '');
   const [isSaved, setIsSaved] = useState(false);
   const [noteBody, setNoteBody] = useState('');
 
   const badge = getCommunicationStatusBadge(communication.status);
+  const requestTypeBadge = communication.requestType
+    ? getCommunicationRequestTypeBadge(communication.requestType)
+    : null;
 
   const history = useMemo(() => {
     const events: { key: string; icon: React.ReactNode; label: string; at: string }[] = [
@@ -66,7 +78,13 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
   }, [communication.createdAt, communication.createdByName, communication.notes]);
 
   const handleSave = () => {
-    onUpdate(communication.id, { status, handledBy, method, nextFollowUpDate: nextFollowUpDate || null });
+    onUpdate(communication.id, {
+      status,
+      handledBy,
+      method,
+      requestType,
+      nextFollowUpDate: nextFollowUpDate || null,
+    });
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };
@@ -97,6 +115,11 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
               <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${badge.bg} ${badge.text}`}>
                 {badge.label}
               </span>
+              {requestTypeBadge && (
+                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${requestTypeBadge.bg} ${requestTypeBadge.text}`}>
+                  {requestTypeBadge.label}
+                </span>
+              )}
               <span className="text-xs text-[#6B7A88]">
                 {getCommunicationMethodLabel(communication.method)} • {formatDate(communication.dateReceived)}
               </span>
@@ -213,6 +236,23 @@ export const CommunicationDetail: React.FC<CommunicationDetailProps> = ({
                 <option value="email">Email</option>
                 <option value="text">Text</option>
                 <option value="in_person">In Person</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] text-[#6B7A88] mb-1">Type of Request</label>
+              <select
+                value={requestType || ''}
+                onChange={(e) =>
+                  setRequestType(e.target.value ? (e.target.value as CommunicationRequestType) : null)
+                }
+                className="w-full text-xs p-2.5 bg-[#FBFBF9] border border-[#DFE2DE] rounded-lg text-[#12161A] outline-none"
+              >
+                <option value="">— Not Set —</option>
+                <option value="order_status">Order Status</option>
+                <option value="installation_coordination">Installation Coordination</option>
+                <option value="project_scope">Project / Scope Question</option>
                 <option value="other">Other</option>
               </select>
             </div>

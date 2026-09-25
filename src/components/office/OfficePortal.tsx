@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ClipboardList, Plus, LogOut, CheckCircle2, RefreshCw, Users, MessageCircle, Trash2 } from 'lucide-react';
-import { CommunicationMethod, CommunicationStatus, CustomerCommunication, ServiceCall, UserProfile, UserRole } from '../../types';
+import {
+  CommunicationMethod,
+  CommunicationRequestType,
+  CommunicationStatus,
+  CustomerCommunication,
+  ServiceCall,
+  UserProfile,
+  UserRole,
+} from '../../types';
 import * as api from '../../lib/api';
 import { ServiceCallsTable } from './ServiceCallsTable';
 import { CallDetailOffice } from './CallDetailOffice';
@@ -244,6 +252,7 @@ export const OfficePortal: React.FC<OfficePortalProps> = ({ currentUser, onLogou
       status?: CommunicationStatus;
       handledBy?: string;
       method?: CommunicationMethod;
+      requestType?: CommunicationRequestType | null;
       nextFollowUpDate?: string | null;
     }
   ) => {

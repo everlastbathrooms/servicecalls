@@ -25,10 +25,23 @@ export function formatDate(dateString?: string | null): string {
   }
 }
 
+// Bare "YYYY-MM-DD" values (reported/received/follow-up dates — no time
+// component) must be read as a calendar date, not an instant: `new
+// Date("2026-09-25")` parses that as UTC midnight, which localizes to the
+// evening before in any zone west of UTC (e.g. EST), shifting the date back
+// a day. Timestamps that include a time/offset parse correctly as-is.
+function parseAsLocalDate(dateString: string): Date {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    const [y, m, d] = dateString.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+  return new Date(dateString);
+}
+
 export function formatRelativeDate(dateString?: string | null): string {
   if (!dateString) return '';
   try {
-    const date = new Date(dateString);
+    const date = parseAsLocalDate(dateString);
     const now = new Date();
     // Compare calendar days (in the viewer's local time zone), not raw
     // elapsed hours — otherwise a note from 10pm last night reads as
